@@ -1,0 +1,404 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{parskip}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{array}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    urlcolor=blue,
+    citecolor=blue
+}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    backgroundcolor=\color{gray!10},
+    frame=single,
+    breaklines=true,
+    columns=fullflexible
+}
+
+\title{
+    \textbf{CENG 467 — Term Project Progress Report} \\[0.5em]
+    \Large Advanced RAG with Hard Negative Mining
+}
+
+\author{
+    Erman Akıncı (300201066) \quad
+    Ahmet Yılmaz (300201067) \quad
+    Kaan Cesur (290201066)
+}
+
+\date{
+    İzmir Institute of Technology (İYTE) \\
+    CENG 467 Natural Language Understanding and Generation \\
+    Prof.\ Dr.\ Aytuğ ONAN \quad Spring 2026 \\[0.5em]
+    \textit{Submitted: May 14, 2026}
+}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+% ---------------------------------------------------------------
+\section{Project Title, Group Members, and Problem Definition}
+
+\subsection*{Task Description}
+
+This project addresses the task of \textbf{open-domain question answering (QA)} using a
+Retrieval-Augmented Generation (RAG) pipeline. Given a natural language question, the
+system must retrieve relevant passages from a corpus and produce a correct short answer.
+
+\subsection*{Why This Task Is Important}
+
+Large language models (LLMs) are prone to hallucination when answering factual questions
+from parametric memory alone. RAG systems ground model outputs in retrieved evidence,
+improving factual accuracy and interpretability. The retrieval component is a critical
+bottleneck: a retriever that fails to surface the correct passage makes correct answer
+generation impossible regardless of generator quality.
+
+\subsection*{Input and Output}
+
+\begin{itemize}[noitemsep]
+    \item \textbf{Input:} A natural language question
+          (e.g., \textit{``Were Scott Derrickson and Ed Wood of the same nationality?''})
+    \item \textbf{Output:} A short answer string (e.g., \textit{``yes''})
+    \item \textbf{Supporting context:} A set of passages retrieved from a candidate corpus
+\end{itemize}
+
+\subsection*{Task Type}
+
+Multi-hop question answering with retrieval. The task requires combining information
+from multiple documents, making it a joint retrieval and reading comprehension problem.
+
+\subsection*{Technical Challenge}
+
+Standard retrieval methods such as BM25 rely on lexical overlap, which fails for
+paraphrased or semantically complex questions. Dense retrievers learn semantic
+representations but require hard negative examples during training to distinguish
+between superficially similar but factually incorrect passages. Without hard negative
+mining, the retriever learns trivially from easy negatives and degrades on difficult
+multi-hop questions.
+
+% ---------------------------------------------------------------
+\section{Dataset / Benchmark Status}
+
+\subsection*{Dataset Information}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Property} & \textbf{Value} \\
+\midrule
+Name              & HotpotQA \\
+Setting           & Distractor \\
+Source            & HuggingFace \texttt{datasets} library \\
+Train split       & 90,447 examples \\
+Validation split  & 7,405 examples \\
+Test split        & Not publicly available \\
+Input format      & Question + 10 candidate passages (title + sentences) \\
+Output format     & Short answer string \\
+Answer types      & Span extraction, yes/no \\
+\bottomrule
+\end{tabular}
+\caption{HotpotQA dataset properties}
+\end{table}
+
+\subsection*{Current Status}
+
+The dataset has been successfully downloaded and loaded via the HuggingFace
+\texttt{datasets} library. Preprocessing and tokenization for BM25 retrieval is complete.
+Context encoder tokenization for DPR (max length 256 tokens, padding, truncation) is
+implemented.
+
+\subsection*{Preprocessing Steps Completed}
+
+\begin{itemize}[noitemsep]
+    \item Passage construction: document title concatenated with all sentences
+    \item BM25 tokenization: lowercasing, punctuation removal, whitespace split
+    \item DPR tokenization: HuggingFace tokenizer, truncation at 256 tokens for contexts
+          and 64 tokens for questions
+\end{itemize}
+
+\subsection*{Known Issues}
+
+\begin{itemize}[noitemsep]
+    \item Test set labels are not publicly released; all evaluation uses the validation split.
+    \item Some passages exceed 256 tokens and are truncated during DPR encoding.
+    \item The distractor setting provides only 10 passages per question rather than a
+          full corpus; scaling to full corpus retrieval is a planned extension.
+\end{itemize}
+
+% ---------------------------------------------------------------
+\section{Literature Review Progress}
+
+\paragraph{Dense Passage Retrieval (DPR) — Karpukhin et al., 2020.}
+DPR introduced bi-encoder retrieval where questions and passages are encoded
+independently using BERT-based encoders and matched via dot product similarity.
+This work established the foundation for our dense retrieval baseline and demonstrated
+that dense retrievers can outperform BM25 when trained with in-batch negatives.
+
+\paragraph{ANCE — Xiong et al., 2021.}
+Approximate Nearest Neighbor Negative Contrastive Estimation (ANCE) trains dense
+retrievers with hard negatives selected from the top results of the retriever itself
+at each training checkpoint. This approach is the primary methodological reference
+for the hard negative mining component of our proposed system.
+
+\paragraph{RocketQA — Qu et al., 2021.}
+RocketQA improved DPR training by using cross-encoder-based hard negative filtering
+and denoised training data. It provides a reference upper bound for retrieval
+performance and informs our ablation study design.
+
+\paragraph{HotpotQA — Yang et al., 2018.}
+The original paper introducing the dataset describes the multi-hop reasoning challenge
+and the distractor setting, and reports baseline numbers for BM25 and early neural
+retrieval systems.
+
+% ⚠️ BOŞLUK: Erman — 1-2 makale daha ekle (örn. RAG Lewis et al. 2020, ColBERT)
+
+\subsection*{Technical Direction}
+
+Based on the reviewed literature, our project follows the DPR + hard negative mining
+paradigm. We will use BM25-retrieved passages as hard negatives for fine-tuning the
+DPR model, following the finding in ANCE that BM25 negatives are a strong and
+computationally inexpensive source of hard negatives.
+
+% ---------------------------------------------------------------
+\section{Baseline Models or Prompting Strategies}
+
+\subsection*{Baseline 1: BM25}
+
+BM25 (Okapi BM25) is a classical probabilistic retrieval model based on term frequency
+and inverse document frequency. It requires no training and serves as a strong lexical
+baseline. We use the \texttt{rank\_bm25} Python library with lowercased,
+punctuation-removed tokenization.
+
+\textbf{Status: Fully implemented and evaluated.}
+
+\subsection*{Baseline 2: Vanilla DPR}
+
+We use the pretrained DPR encoders released by Facebook Research
+(\texttt{facebook/dpr-question\_encoder-single-nq-base} and
+\texttt{facebook/dpr-ctx\_encoder-single-nq-base}), trained on Natural Questions.
+No fine-tuning is applied. This baseline measures off-the-shelf dense retrieval
+performance on HotpotQA without domain adaptation or hard negative training.
+
+\textbf{Status: Implemented, evaluation in progress.}
+
+\subsection*{Why These Baselines}
+
+BM25 represents the lexical retrieval paradigm and is a standard baseline in all
+retrieval-augmented QA literature. Vanilla DPR represents the semantic retrieval
+paradigm without hard negative fine-tuning, allowing us to isolate the contribution
+of hard negative mining in the final system.
+
+% ---------------------------------------------------------------
+\section{Initial Experimental Results}
+
+Table~\ref{tab:results} reports retrieval results on 500 examples from the
+HotpotQA validation split.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{llllp{3.5cm}}
+\toprule
+\textbf{Model} & \textbf{Recall@5} & \textbf{F1} & \textbf{Exact Match} & \textbf{Status} \\
+\midrule
+BM25                    & 0.972 & 0.060 & 0.004 & Complete \\
+DPR (vanilla)           & 0.982 & 0.064 & 0.002 & Complete \\
+DPR + Hard Negatives    & —     & —     & —     & Planned \\
+\bottomrule
+\end{tabular}
+\caption{Retrieval results on HotpotQA validation (500 examples, top-k=5)}
+\label{tab:results}
+\end{table}
+
+
+\subsection*{Interpretation}
+
+BM25 achieves a Recall@5 of 0.972, meaning it successfully retrieves at least one
+gold passage in the top 5 results for 97.2\% of questions. The low F1 (0.060) and
+Exact Match (0.004) scores reflect the absence of a reader component: the predicted
+answer is approximated as the first sentence of the top retrieved passage, which is
+rarely a short exact-match string. These scores will improve once a reader model or
+LLM is integrated in the next phase.
+
+% ---------------------------------------------------------------
+\section{Planned Improvements and Technical Direction}
+
+The core contribution of this project is training a DPR model with hard negative mining.
+The planned pipeline proceeds as follows:
+
+\begin{enumerate}[noitemsep]
+    \item \textbf{Hard Negative Generation:} For each training question, run BM25 to
+          retrieve top-$k$ passages. Passages that score highly under BM25 but do not
+          contain the gold answer are selected as hard negatives.
+    \item \textbf{DPR Fine-tuning:} Fine-tune the DPR question and context encoders
+          using contrastive loss (in-batch negatives + hard negatives) on the HotpotQA
+          training split (90k examples).
+    \item \textbf{Reader Integration:} Pass the top-3 retrieved passages together with
+          the question to an LLM or extractive QA model to generate the final answer.
+    \item \textbf{FAISS Index:} Build a FAISS flat index over all retrieved passages for
+          scalable nearest-neighbor search.
+\end{enumerate}
+
+% ---------------------------------------------------------------
+\section{Ablation or Prompt Sensitivity Plan}
+
+We plan the following ablations to isolate the contribution of each component:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Ablation} & \textbf{Variable} \\
+\midrule
+A1 & BM25 vs.\ DPR (no fine-tuning): lexical vs.\ semantic retrieval \\
+A2 & DPR vanilla vs.\ DPR + hard negatives: effect of mining \\
+A3 & Hard negative count: $k \in \{1, 5, 10\}$ per question \\
+A4 & Top-$k$ retrieval: Recall@1 vs.\ Recall@3 vs.\ Recall@5 \\
+A5 & With reader vs.\ without reader: retrieval-only vs.\ full RAG \\
+\bottomrule
+\end{tabular}
+\caption{Planned ablation study}
+\end{table}
+
+% ---------------------------------------------------------------
+\section{Error Analysis and Generation Quality Analysis}
+
+\subsection*{Planned Error Analysis}
+
+We will sample 50 failure cases from each baseline and categorize them as follows:
+
+\begin{itemize}[noitemsep]
+    \item \textbf{Lexical gap failures:} BM25 fails because the question uses different
+          vocabulary than the passage.
+    \item \textbf{Semantic confusion:} DPR retrieves topically related but factually
+          incorrect passages.
+    \item \textbf{Multi-hop failures:} Neither baseline retrieves both required supporting
+          passages simultaneously.
+    \item \textbf{Yes/no failures:} Binary-answer questions where the retrieved passage
+          does not contain an explicit yes/no signal.
+\end{itemize}
+
+\subsection*{Generation Quality Plan}
+
+Once the reader is integrated, we will evaluate:
+factual correctness relative to gold answers, fluency of generated answers, and
+hallucination rate (answers not grounded in retrieved passages).
+
+% ---------------------------------------------------------------
+\section{Ethical Considerations and Bias}
+
+This project uses the HotpotQA benchmark derived from Wikipedia. Potential concerns
+include:
+
+\begin{itemize}[noitemsep]
+    \item \textbf{Hallucination risk:} LLM-based readers may generate plausible but
+          factually incorrect answers not supported by retrieved passages.
+    \item \textbf{Coverage bias:} Wikipedia overrepresents English-language and
+          Western-centric topics, which may affect retrieval performance on questions
+          about underrepresented subjects.
+    \item \textbf{Evaluation limitations:} Exact Match and F1 against a single reference
+          answer may penalize semantically correct paraphrases.
+    \item \textbf{API cost constraints:} If an external LLM API is used for answer
+          generation, cost limits the number of evaluated examples.
+\end{itemize}
+
+% ---------------------------------------------------------------
+\section{GitHub and Reproducibility Status}
+
+\textbf{Repository:} % ⚠️ BOŞLUK — GitHub linkini buraya ekle
+\url{https://github.com/KULLANICI_ADI/CENG467_Term_Project}
+
+\subsection*{Current Repository Structure}
+
+\begin{lstlisting}
+CENG467_Term_Project/
+├── src/
+│   ├── load_dataset.py       # HotpotQA loading and inspection
+│   ├── baseline_bm25.py      # BM25 retrieval baseline
+│   └── baseline_dpr.py       # DPR retrieval baseline
+├── results/
+│   └── bm25_results.json     # BM25 evaluation output
+├── data/                     # Empty (loaded via HuggingFace)
+├── notebooks/                # Planned
+├── requirements.txt
+├── .gitignore
+└── README.md
+\end{lstlisting}
+
+\subsection*{Reproducibility Instructions}
+
+\begin{lstlisting}[language=bash]
+# Install dependencies
+pip install -r requirements.txt
+
+# Run BM25 baseline (downloads dataset automatically)
+python src/baseline_bm25.py
+
+# Run DPR baseline (downloads model weights, ~800 MB)
+python src/baseline_dpr.py
+\end{lstlisting}
+
+\subsection*{Status Checklist}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Item} & \textbf{Status} \\
+\midrule
+GitHub repository       & % ⚠️ BOŞLUK
+                          Open / link pending \\
+\texttt{requirements.txt} & Done \\
+README                  & Done \\
+Dataset loading script  & Done \\
+BM25 baseline script    & Done \\
+DPR baseline script     & Done \\
+\texttt{results/bm25\_results.json} & Done \\
+Consistent commit history & In progress \\
+\bottomrule
+\end{tabular}
+\caption{Repository status checklist}
+\end{table}
+
+% ---------------------------------------------------------------
+\section{Current Challenges and Next Steps}
+
+\subsection*{Current Challenges}
+
+\begin{itemize}[noitemsep]
+    \item \textbf{Computational cost:} DPR passage encoding is slow on CPU
+          (approximately 5--10 minutes for 500 examples). Fine-tuning will require
+          GPU access (Google Colab or university cluster).
+    \item \textbf{No reader component:} Current F1/EM scores reflect retrieval-only
+          heuristics, not true QA performance.
+    \item \textbf{Hard negative mining not yet implemented:} This is the core
+          contribution and the focus of the next development phase.
+\end{itemize}
+
+\subsection*{Next Steps Before Final Submission}
+
+\begin{enumerate}[noitemsep]
+    \item Complete DPR vanilla evaluation and record results in Table~\ref{tab:results}
+    \item Implement hard negative mining using BM25 scores on the training split
+    \item Fine-tune DPR with hard negatives on GPU
+    \item Integrate a reader model (extractive QA or LLM API)
+    \item Run the full ablation study
+    \item Write the final report in LNCS format
+\end{enumerate}
+
+\end{document}
