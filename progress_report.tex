@@ -137,8 +137,9 @@ implemented.
 \begin{itemize}[noitemsep]
     \item Test set labels are not publicly released; all evaluation uses the validation split.
     \item Some passages exceed 256 tokens and are truncated during DPR encoding.
-    \item The distractor setting provides only 10 passages per question rather than a
-          full corpus; scaling to full corpus retrieval is a planned extension.
+    \item Retrieval is performed over the 10 candidate passages provided per question
+          in the distractor setting, rather than a full corpus. This inflates Recall@5
+          scores. Full corpus retrieval using a FAISS index is planned for the next phase.
 \end{itemize}
 
 % ---------------------------------------------------------------
@@ -166,7 +167,18 @@ The original paper introducing the dataset describes the multi-hop reasoning cha
 and the distractor setting, and reports baseline numbers for BM25 and early neural
 retrieval systems.
 
-% ⚠️ BOŞLUK: Erman — 1-2 makale daha ekle (örn. RAG Lewis et al. 2020, ColBERT)
+\paragraph{Retrieval-Augmented Generation --- Lewis et al., 2020.}
+Lewis et al.\ proposed the RAG framework, which combines a dense retriever with
+a sequence-to-sequence generator to produce answers grounded in retrieved passages.
+This work directly motivates our pipeline architecture, where a retriever surfaces
+relevant evidence and a reader generates the final answer.
+
+\paragraph{ColBERT --- Khattab and Zaharia, 2020.}
+ColBERT introduced late interaction retrieval, encoding query and passage tokens
+independently but computing similarity via token-level interactions. It achieves
+higher retrieval accuracy than standard bi-encoders at the cost of increased index
+size, and serves as a reference point for understanding retrieval quality trade-offs
+in our ablation design.
 
 \subsection*{Technical Direction}
 
@@ -195,7 +207,7 @@ We use the pretrained DPR encoders released by Facebook Research
 No fine-tuning is applied. This baseline measures off-the-shelf dense retrieval
 performance on HotpotQA without domain adaptation or hard negative training.
 
-\textbf{Status: Implemented, evaluation in progress.}
+\textbf{Status: Fully implemented and evaluated.}
 
 \subsection*{Why These Baselines}
 
@@ -234,6 +246,8 @@ Exact Match (0.004) scores reflect the absence of a reader component: the predic
 answer is approximated as the first sentence of the top retrieved passage, which is
 rarely a short exact-match string. These scores will improve once a reader model or
 LLM is integrated in the next phase.
+F1 and EM scores are therefore not meaningful at this stage and are reported only
+for completeness.
 
 % ---------------------------------------------------------------
 \section{Planned Improvements and Technical Direction}
@@ -242,9 +256,10 @@ The core contribution of this project is training a DPR model with hard negative
 The planned pipeline proceeds as follows:
 
 \begin{enumerate}[noitemsep]
-    \item \textbf{Hard Negative Generation:} For each training question, run BM25 to
-          retrieve top-$k$ passages. Passages that score highly under BM25 but do not
-          contain the gold answer are selected as hard negatives.
+    \item \textbf{Hard Negative Generation (Completed):} BM25 was run on the training
+          split to retrieve top-$k$ passages per question. Passages scoring highly under
+          BM25 but not containing the gold answer were selected as hard negatives and
+          saved to \texttt{data/hard\_negatives.json} (1,000 training examples).
     \item \textbf{DPR Fine-tuning:} Fine-tune the DPR question and context encoders
           using contrastive loss (in-batch negatives + hard negatives) on the HotpotQA
           training split (90k examples).
@@ -320,20 +335,22 @@ include:
 % ---------------------------------------------------------------
 \section{GitHub and Reproducibility Status}
 
-\textbf{Repository:} % ⚠️ BOŞLUK — GitHub linkini buraya ekle
-\url{https://github.com/KULLANICI_ADI/CENG467_Term_Project}
+\textbf{Repository:}
+\url{https://github.com/ahmet-yilmaz-cs/CENG467_Term_Project}
 
 \subsection*{Current Repository Structure}
 
 \begin{lstlisting}
 CENG467_Term_Project/
 ├── src/
-│   ├── load_dataset.py       # HotpotQA loading and inspection
-│   ├── baseline_bm25.py      # BM25 retrieval baseline
-│   └── baseline_dpr.py       # DPR retrieval baseline
+│   ├── load_dataset.py         # HotpotQA loading and inspection
+│   ├── baseline_bm25.py        # BM25 retrieval baseline
+│   ├── baseline_dpr.py         # DPR retrieval baseline
+│   └── hard_negative_mining.py # BM25-based hard negative generation
 ├── results/
-│   └── bm25_results.json     # BM25 evaluation output
-├── data/                     # Empty (loaded via HuggingFace)
+│   └── bm25_results.json       # BM25 evaluation output
+├── data/
+│   └── hard_negatives.json     # Mined hard negatives (1,000 train examples)
 ├── notebooks/                # Planned
 ├── requirements.txt
 ├── .gitignore
@@ -361,14 +378,15 @@ python src/baseline_dpr.py
 \toprule
 \textbf{Item} & \textbf{Status} \\
 \midrule
-GitHub repository       & % ⚠️ BOŞLUK
-                          Open / link pending \\
+GitHub repository       & Open (\url{https://github.com/ahmet-yilmaz-cs/CENG467_Term_Project}) \\
 \texttt{requirements.txt} & Done \\
 README                  & Done \\
 Dataset loading script  & Done \\
 BM25 baseline script    & Done \\
 DPR baseline script     & Done \\
 \texttt{results/bm25\_results.json} & Done \\
+\texttt{src/hard\_negative\_mining.py} & Done \\
+\texttt{data/hard\_negatives.json}     & Done \\
 Consistent commit history & In progress \\
 \bottomrule
 \end{tabular}
@@ -386,15 +404,15 @@ Consistent commit history & In progress \\
           GPU access (Google Colab or university cluster).
     \item \textbf{No reader component:} Current F1/EM scores reflect retrieval-only
           heuristics, not true QA performance.
-    \item \textbf{Hard negative mining not yet implemented:} This is the core
-          contribution and the focus of the next development phase.
+    \item \textbf{DPR fine-tuning not yet started:} Hard negative mining output
+          has been generated (\texttt{data/hard\_negatives.json}, 1{,}000 training
+          examples). Fine-tuning the DPR encoders with these negatives is the focus
+          of the next development phase.
 \end{itemize}
 
 \subsection*{Next Steps Before Final Submission}
 
 \begin{enumerate}[noitemsep]
-    \item Complete DPR vanilla evaluation and record results in Table~\ref{tab:results}
-    \item Implement hard negative mining using BM25 scores on the training split
     \item Fine-tune DPR with hard negatives on GPU
     \item Integrate a reader model (extractive QA or LLM API)
     \item Run the full ablation study
