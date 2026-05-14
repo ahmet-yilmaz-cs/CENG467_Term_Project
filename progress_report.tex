@@ -229,8 +229,8 @@ HotpotQA validation split.
 \textbf{Model} & \textbf{Recall@5} & \textbf{F1} & \textbf{Exact Match} & \textbf{Status} \\
 \midrule
 BM25                    & 0.972 & 0.060 & 0.004 & Complete \\
-DPR (vanilla)           & 0.982 & 0.064 & 0.002 & Complete \\
-DPR + Hard Negatives    & —     & —     & —     & Planned \\
+DPR (Vanilla)           & 0.982 & 0.064 & 0.002 & Complete \\
+DPR + Hard Negatives    & —     & —     & —     & In progress (Hard Negatives is generated, Fine-Tuning is pending) \\
 \bottomrule
 \end{tabular}
 \caption{Retrieval results on HotpotQA validation (500 examples, top-k=5)}
@@ -241,11 +241,19 @@ DPR + Hard Negatives    & —     & —     & —     & Planned \\
 \subsection*{Interpretation}
 
 BM25 achieves a Recall@5 of 0.972, meaning it successfully retrieves at least one
-gold passage in the top 5 results for 97.2\% of questions. The low F1 (0.060) and
-Exact Match (0.004) scores reflect the absence of a reader component: the predicted
-answer is approximated as the first sentence of the top retrieved passage, which is
-rarely a short exact-match string. These scores will improve once a reader model or
-LLM is integrated in the next phase.
+gold passage in the top 5 results for 97.2\% of questions. Vanilla DPR achieves
+0.982, a marginal improvement of 1.0 percentage points. This gap is expected to be
+small: the DPR model used here was pretrained on Natural Questions, not HotpotQA,
+so no domain adaptation has been applied. The improvement demonstrates that even
+off-the-shelf dense retrieval outperforms lexical matching on this dataset; we
+expect a larger gain once the encoders are fine-tuned with hard negatives on the
+HotpotQA training split.
+
+The low F1 (0.060) and Exact Match (0.004) scores reflect the absence of a reader
+component: the predicted answer is approximated as the first sentence of the top
+retrieved passage, which is rarely a short exact-match string. These scores will
+improve once a reader model or LLM is integrated in the next phase.
+
 F1 and EM scores are therefore not meaningful at this stage and are reported only
 for completeness.
 
@@ -259,7 +267,10 @@ The planned pipeline proceeds as follows:
     \item \textbf{Hard Negative Generation (Completed):} BM25 was run on the training
           split to retrieve top-$k$ passages per question. Passages scoring highly under
           BM25 but not containing the gold answer were selected as hard negatives and
-          saved to \texttt{data/hard\_negatives.json} (1,000 training examples).
+          saved to \texttt{data/hard\_negatives.json}. The initial run covers 1,000
+          training examples as a proof-of-concept to validate the pipeline; full-scale
+          mining over the complete 90k training split will be performed prior to
+          fine-tuning on GPU.
     \item \textbf{DPR Fine-tuning:} Fine-tune the DPR question and context encoders
           using contrastive loss (in-batch negatives + hard negatives) on the HotpotQA
           training split (90k examples).
