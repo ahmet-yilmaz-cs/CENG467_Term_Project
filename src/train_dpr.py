@@ -212,7 +212,7 @@ if __name__ == "__main__":
         output_dir="models/dpr_finetuned",
         max_samples=None,   # local test: set to 50; full run: None
         epochs=3,           # local test: set to 1
-        batch_size=16,      # CPU: set to 4; Colab GPU: 16
+        batch_size=4,       # CPU: set to 2-4; Colab T4 GPU: 8
         lr=2e-5,
     )
     evaluate_recall(model_dir=model_dir, max_samples=500, top_k=5)
