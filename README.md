@@ -23,4 +23,7 @@ python src/baseline_dpr.py
 
 # Hard negative mining
 python src/hard_negative_mining.py
+
+# DPR fine-tuning with hard negatives
+python src/train_dpr.py
 ```

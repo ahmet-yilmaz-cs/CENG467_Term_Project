@@ -9,3 +9,4 @@ data/raw/
 *.pt
 *.bin
 .DS_Store
+models/
