@@ -1,0 +1,412 @@
+{
+  "metrics": {
+    "model": "DPR (vanilla)",
+    "num_samples": 500,
+    "top_k": 5,
+    "Recall@5": 0.982,
+    "F1": 0.0639,
+    "Exact Match": 0.002
+  },
+  "predictions": [
+    {
+      "question": "Were Scott Derrickson and Ed Wood of the same nationality?",
+      "gold_answer": "yes",
+      "predicted": "Ed Wood is a 1994 American biographical period comedy-drama film directed and produced by Tim Burton, and starring Johnny Depp as cult filmmaker Ed Wood",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?",
+      "gold_answer": "Chief of Protocol",
+      "predicted": "Kiss and Tell is a 1945 American comedy film starring then 17-year-old Shirley Temple as Corliss Archer",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "What science fantasy young adult series, told in first person, has a set of companion books narrating the stories of enslaved worlds and alien species?",
+      "gold_answer": "Animorphs",
+      "predicted": "Animorphs is a science fantasy series of young adult books written by Katherine Applegate and her husband Michael Grant, writing together under the name K",
+      "hit": 1,
+      "f1": 0.07692307692307693,
+      "em": 0
+    },
+    {
+      "question": "Are the Laleli Mosque and Esma Sultan Mansion located in the same neighborhood?",
+      "gold_answer": "no",
+      "predicted": "The Laleli Mosque (Turkish: \"Laleli Camii, or Tulip Mosque\" ) is an 18th-century Ottoman imperial mosque located in Laleli, Fatih, Istanbul, Turkey",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "The director of the romantic comedy \"Big Stone Gap\" is based in what New York city?",
+      "gold_answer": "Greenwich Village, New York City",
+      "predicted": "Big Stone Gap is a 2014 American drama romantic comedy film written and directed by Adriana Trigiani and produced by Donna Gigliotti for Altar Identity Studios, a subsidiary of Media Society",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "2014 S/S is the debut album of a South Korean boy group that was formed by who?",
+      "gold_answer": "YG Entertainment",
+      "predicted": "2014 S/S is the debut album of South Korean group WINNER",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "Who was known by his stage name Aladin and helped organizations improve their performance as a consultant?",
+      "gold_answer": "Eenasul Fateh",
+      "predicted": "Eenasul Fateh (Bengali: \u0988\u09a8\u09be\u09b8\u09c1\u09b2 \u09ab\u09be\u09a4\u09c7\u09b9 ; born 3 April 1959), also known by his stage name Aladin, is a Bangladeshi-British cultural practitioner, magician, live artist and former international management consultant",
+      "hit": 1,
+      "f1": 0.12903225806451613,
+      "em": 0
+    },
+    {
+      "question": "The arena where the Lewiston Maineiacs played their home games can seat how many people?",
+      "gold_answer": "3,677 seated",
+      "predicted": "The Androscoggin Bank Colis\u00e9e (formerly Central Maine Civic Center and Lewiston Colisee) is a 4,000 capacity (3,677 seated) multi-purpose arena, in Lewiston, Maine, that opened in 1958",
+      "hit": 1,
+      "f1": 0.13793103448275862,
+      "em": 0
+    },
+    {
+      "question": "Who is older, Annie Morton or Terry Richardson?",
+      "gold_answer": "Terry Richardson",
+      "predicted": "Piano Girl (Turkish: \"Deli Deli Olma\" ) is a 2009 Turkish comedy-drama film, directed by Murat Sara\u00e7o\u011flu, starring Tar\u0131k Akan and \u015eerif Sezer as two elderly people forced to question their histories and reveal their big secrets",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "Are Local H and For Against both from the United States?",
+      "gold_answer": "yes",
+      "predicted": "For Against is a United States post-punk/dream pop band from Lincoln, Nebraska",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "What is the name of the fight song of the university whose main campus is in Lawrence, Kansas and whose branch campuses are in the Kansas City metropolitan area?",
+      "gold_answer": "Kansas Song",
+      "predicted": "Kansas Song (We\u2019re From Kansas) is a fight song of the University of Kansas",
+      "hit": 1,
+      "f1": 0.25,
+      "em": 0
+    },
+    {
+      "question": "What screenwriter with credits for \"Evolution\" co-wrote a film starring Nicolas Cage and T\u00e9a Leoni?",
+      "gold_answer": "David Weissman",
+      "predicted": "David Weissman is a screenwriter and director",
+      "hit": 1,
+      "f1": 0.4444444444444445,
+      "em": 0
+    },
+    {
+      "question": "What year did Guns N Roses perform a promo for a movie starring Arnold Schwarzenegger as a former New York Police detective?",
+      "gold_answer": "1999",
+      "predicted": "End of Days is a 1999 American fantasy action horror thriller film directed by Peter Hyams and starring Arnold Schwarzenegger, Gabriel Byrne, Robin Tunney, Kevin Pollak, Rod Steiger, CCH Pounder, and Udo Kier",
+      "hit": 1,
+      "f1": 0.05882352941176471,
+      "em": 0
+    },
+    {
+      "question": "Are Random House Tower and 888 7th Avenue both used for real estate?",
+      "gold_answer": "no",
+      "predicted": "The Random House Tower, also known as the Park Imperial Apartments, is a 52-story mixed-use tower in New York City, United States, that is used as the headquarters of book publisher Random House and a luxury apartment complex",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "The football manager who recruited David Beckham managed Manchester United during what timeframe?",
+      "gold_answer": "from 1986 to 2013",
+      "predicted": "Sir Alexander Chapman Ferguson, CBE (born 31 December 1941) is a Scottish former football manager and player who managed Manchester United from 1986 to 2013",
+      "hit": 1,
+      "f1": 0.2758620689655173,
+      "em": 0
+    },
+    {
+      "question": "Brown State Fishing Lake is in a country that has a population of how many inhabitants ?",
+      "gold_answer": "9,984",
+      "predicted": "Brown State Fishing Lake (sometimes also known as Brown State Fishing Lake And Wildlife Area) is a protected area in Brown County, Kansas in the United States",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "The Vermont Catamounts men's soccer team currently competes in a conference that was formerly known as what from 1988 to 1996?",
+      "gold_answer": "the North Atlantic Conference",
+      "predicted": "The Vermont Catamounts Basketball team is the basketball team that represents the University of Vermont in Burlington, Vermont",
+      "hit": 1,
+      "f1": 0.0909090909090909,
+      "em": 0
+    },
+    {
+      "question": "Are Giuseppe Verdi and Ambroise Thomas both Opera composers ?",
+      "gold_answer": "yes",
+      "predicted": "Charles Louis Ambroise Thomas (5 August 1811 \u2013 12 February 1896) was a French composer, best known for his operas \"Mignon\" (1866) and \"Hamlet\" (1868, after Shakespeare) and as Director of the Conservatoire de Paris from 1871 till his death",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "Roger O. Egeberg was Assistant Secretary for Health and Scientific Affairs during the administration of a president that served during what years?",
+      "gold_answer": "1969 until 1974",
+      "predicted": "Rear Admiral Edward Dana Martin (MD) is the former Acting Assistant Secretary of Defense (Health Affairs)",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "Which writer was from England, Henry Roth or Robert Erskine Childers?",
+      "gold_answer": "Robert Erskine Childers DSC",
+      "predicted": "Henry Roth (February 8, 1906 \u2013 October 13, 1995) was an American novelist and short story writer",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "Which other Mexican Formula One race car driver has held the podium besides the Force India driver born in 1990?",
+      "gold_answer": "Pedro Rodr\u00edguez",
+      "predicted": "There have been six Formula One drivers from Mexico who have taken part in races since the championship began in 1950",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "This singer of A Rather Blustery Day also voiced what hedgehog?",
+      "gold_answer": "Sonic",
+      "predicted": "\"A Rather Blustery Day\" is a whimsical song from the Walt Disney musical film featurette, \"Winnie the Pooh and the Blustery Day\"",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "Aside from the Apple Remote, what other device can control the program Apple Remote was originally designed to interact with?",
+      "gold_answer": "keyboard function keys",
+      "predicted": "Apple Remote Desktop (ARD) is a Macintosh application produced by Apple Inc",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "Which performance act has a higher instrument to person ratio, Badly Drawn Boy or Wolf Alice? ",
+      "gold_answer": "Badly Drawn Boy",
+      "predicted": "Damon Michael Gough (born 2 October 1969, in Dunstable, Bedfordshire), known by the stage name Badly Drawn Boy, is an English indie singer-songwriter and multi-instrumentalist",
+      "hit": 1,
+      "f1": 0.21428571428571425,
+      "em": 0
+    },
+    {
+      "question": "What was the father of Kasper Schmeichel voted to be by the IFFHS in 1992?",
+      "gold_answer": "World's Best Goalkeeper",
+      "predicted": "The IFFHS World's Best Goalkeeper is a football award given annually since 1987 to the most outstanding goalkeeper of the year as voted by the International Federation of Football History & Statistics (IFFHS)",
+      "hit": 1,
+      "f1": 0.17142857142857143,
+      "em": 0
+    },
+    {
+      "question": "Who was the writer of These Boots Are Made for Walkin' and who died in 2007?",
+      "gold_answer": "Barton Lee Hazlewood",
+      "predicted": "\"These Boots Are Made for Walkin' is a hit song written by Lee Hazlewood and recorded by Nancy Sinatra",
+      "hit": 1,
+      "f1": 0.18181818181818182,
+      "em": 0
+    },
+    {
+      "question": "The 2011\u201312 VCU Rams men's basketball team, led by third year head coach Shaka Smart, represented Virginia Commonwealth University which was founded in what year?",
+      "gold_answer": "1838",
+      "predicted": "The 2011\u201312 VCU Rams men's basketball team represented Virginia Commonwealth University during the 2011\u201312 NCAA Division I men's basketball season",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "Are both Dictyosperma, and Huernia described as a genus?",
+      "gold_answer": "yes",
+      "predicted": "Dictyosperma is a monotypic genus of flowering plant in the palm family found in the Mascarene Islands in the Indian Ocean (Mauritius, R\u00e9union and Rodrigues)",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "Kaiser Ventures corporation was founded by an American industrialist who became known as the father of modern American shipbuilding?",
+      "gold_answer": "Henry J. Kaiser",
+      "predicted": "Henry John Kaiser (May 9, 1882 \u2013 August 24, 1967) was an American industrialist who became known as the father of modern American shipbuilding",
+      "hit": 1,
+      "f1": 0.14814814814814814,
+      "em": 0
+    },
+    {
+      "question": "What is the name for the adventure in \"Tunnels and Trolls\", a game designed by Ken St. Andre?",
+      "gold_answer": "Arena of Khazan",
+      "predicted": "Tunnels & Trolls (abbreviated \"T&T\") is a fantasy role-playing game designed by Ken St",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "When was Poison's album \"Shut Up, Make Love\" released?",
+      "gold_answer": "2000",
+      "predicted": "\"Shut Up, Make Love\" is a song by American rock band Poison; released in 2000, it was the first single presented to radio stations from their 2000 \"Crack a Smile",
+      "hit": 1,
+      "f1": 0.06451612903225806,
+      "em": 0
+    },
+    {
+      "question": "Hayden is a singer-songwriter from Canada, but where does Buck-Tick hail from?",
+      "gold_answer": "Fujioka, Gunma",
+      "predicted": "Paul Hayden Desser (born February 12, 1971) who records as Hayden, is a Canadian singer-songwriter from Thornhill, Ontario",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "Which  French ace pilot and adventurer fly L'Oiseau Blanc",
+      "gold_answer": "Charles Eug\u00e8ne",
+      "predicted": "L'Oiseau Blanc (commonly known in the English-speaking world as The White Bird ) was a French Levasseur PL",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "Are Freakonomics and In the Realm of the Hackers both American documentaries?",
+      "gold_answer": "no",
+      "predicted": "In The Realm of the Hackers is a 2003 Australian documentary directed by Kevin Anderson about the prominent hacker community, centered in Melbourne, Australia in the late 1980s until early 1990",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "Which band, Letters to Cleo or Screaming Trees, had more members?",
+      "gold_answer": "Letters to Cleo",
+      "predicted": "Letters to Cleo are an alternative rock band from Boston, Massachusetts, best known for the 1994 single, \"Here & Now\", from their full-length debut album, \"Aurora Gory Alice\"",
+      "hit": 1,
+      "f1": 0.19999999999999998,
+      "em": 0
+    },
+    {
+      "question": "Alexander Kerensky was defeated and destroyed by the Bolsheviks in the course of a civil war that ended when ?",
+      "gold_answer": "October 1922",
+      "predicted": "The Russian Civil War (Russian: \u0413\u0440\u0430\u0436\u0434\u0430\u0301\u043d\u0441\u043a\u0430\u044f \u0432\u043e\u0439\u043d\u0430\u0301 \u0432 \u0420\u043e\u0441\u0441\u0438\u0301\u0438 , \"Grazhdanskaya voyna v Rossiyi\" ; November 1917 \u2013 October 1922) was a multi-party war in the former Russian Empire immediately after the Russian Revolutions of 1917, as many factions vied to determine Russia's political future",
+      "hit": 1,
+      "f1": 0.08888888888888888,
+      "em": 0
+    },
+    {
+      "question": "Seven Brief Lessons on Physics was written by an Italian physicist that has worked in France since what year?",
+      "gold_answer": "2000",
+      "predicted": "Seven Brief Lessons on Physics (Italian: \"\" ) is a short book by the Italian physicist Carlo Rovelli",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "The Livesey Hal War Memorial commemorates the fallen of which war, that had over 60 million casualties?",
+      "gold_answer": "World War II",
+      "predicted": "The Livesey Hall War Memorial commemorates the fallen of World War I and World War II who had been employed by the South Suburban Gas Company of London",
+      "hit": 1,
+      "f1": 0.19354838709677416,
+      "em": 0
+    },
+    {
+      "question": "Are both Elko Regional Airport and Gerald R. Ford International Airport located in Michigan?",
+      "gold_answer": "no",
+      "predicted": "Gerald R",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "Ralph Hefferline was a psychology professor at a university that is located in what city?",
+      "gold_answer": "New York City",
+      "predicted": "Ralph Franklin Hefferline (15 February 1910 in Muncie, Indiana \u2013 16 March 1974) was a psychology professor at Columbia University",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "Which dog's ancestors include Gordon and Irish Setters: the Manchester Terrier or the Scotch Collie?",
+      "gold_answer": "Scotch Collie",
+      "predicted": "The Scotch Collie is a landrace breed of dog which originated from the highland regions of Scotland",
+      "hit": 1,
+      "f1": 0.21052631578947367,
+      "em": 0
+    },
+    {
+      "question": "Where is the company that Sachin Warrier worked for as a software engineer headquartered? ",
+      "gold_answer": "Mumbai",
+      "predicted": "Sachin Bansal (born 5 August 1981) is an Indian Software engineer and Internet entrepreneur known for co-founding India's e-commerce platform Flipkart",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "A Japanese manga series based on a 16 year old high school student Ichitaka Seto, is written and illustrated by someone born in what year?",
+      "gold_answer": "1962",
+      "predicted": "I\"s (\u30a2\u30a4\u30ba , Aizu ) is a Japanese manga series written and illustrated by Masakazu Katsura",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "The battle in which Giuseppe Arimondi lost his life secured what for Ethiopia?",
+      "gold_answer": "sovereignty",
+      "predicted": "Giuseppe Edoardo Arimondi, OSML, OMS, OCI (Savigliano, 26 April 1846 \u2013 Adwa, 1 March 1896) was an Italian general, mostly known for his role during the First Italo-Ethiopian War",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "Alfred Balk served as the secretary of the Committee on the Employment of Minority Groups in the News Media under which United States Vice President?",
+      "gold_answer": "Nelson Rockefeller",
+      "predicted": "Executive Order 10925, signed by President John F",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "A medieval fortress in Dirleton, East Lothian, Scotland borders on the south side of what coastal area?",
+      "gold_answer": "Yellowcraig",
+      "predicted": "Dirleton Castle is a medieval fortress in the village of Dirleton, East Lothian, Scotland",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "Who is the writer of this song that was inspired by words on a tombstone and was the first track on the box set Back to Mono?",
+      "gold_answer": "Phil Spector",
+      "predicted": "Back to Mono (1958\u20131969) is a box set (4 compact discs or 5 vinyl LPs) compilation of the recorded work of record producer Phil Spector, through the 1960s, released in 1991 by ABKCO as #7118-2",
+      "hit": 1,
+      "f1": 0.1081081081081081,
+      "em": 0
+    },
+    {
+      "question": "What type of forum did a former Soviet statesman initiate?",
+      "gold_answer": "Organizations could come together to address global issues",
+      "predicted": "Mikhail Andreyevich Suslov (Russian: \u041c\u0438\u0445\u0430\u0438\u0301\u043b \u0410\u043d\u0434\u0440\u0435\u0301\u0435\u0432\u0438\u0447 \u0421\u0443\u0301\u0441\u043b\u043e\u0432 ; 21 November\u00a0[O",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "Are Ferocactus and Silene both types of plant?",
+      "gold_answer": "yes",
+      "predicted": "Ferocactus is a genus of large barrel-shaped cacti, mostly with large spines and small flowers",
+      "hit": 1,
+      "f1": 0.0,
+      "em": 0
+    },
+    {
+      "question": "Which British first-generation jet-powered medium bomber was used in the South West Pacific theatre of World War II?",
+      "gold_answer": "English Electric Canberra",
+      "predicted": "The English Electric Canberra is a British first-generation jet-powered medium bomber that was manufactured during the 1950s",
+      "hit": 1,
+      "f1": 0.3,
+      "em": 0
+    }
+  ]
+}

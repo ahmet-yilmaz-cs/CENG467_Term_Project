@@ -39,10 +39,9 @@
 }
 
 \date{
-    İzmir Institute of Technology (İYTE) \\
-    CENG 467 Natural Language Understanding and Generation \\
-    Prof.\ Dr.\ Aytuğ ONAN \quad Spring 2026 \\[0.5em]
-    \textit{Submitted: May 14, 2026}
+    İzmir Institute of Technology \\
+    Spring 2026 \\[0.3em]
+    Prof.\ Dr.\ Aytuğ ONAN
 }
 
 \begin{document}
@@ -92,7 +91,7 @@ mining, the retriever learns trivially from easy negatives and degrades on diffi
 multi-hop questions.
 
 % ---------------------------------------------------------------
-\section{Dataset / Benchmark Status}
+\section{Dataset and Benchmark}
 
 \subsection*{Dataset Information}
 
@@ -116,14 +115,14 @@ Answer types      & Span extraction, yes/no \\
 \caption{HotpotQA dataset properties}
 \end{table}
 
-\subsection*{Current Status}
+\subsection*{Data Preparation}
 
 The dataset has been successfully downloaded and loaded via the HuggingFace
 \texttt{datasets} library. Preprocessing and tokenization for BM25 retrieval is complete.
 Context encoder tokenization for DPR (max length 256 tokens, padding, truncation) is
 implemented.
 
-\subsection*{Preprocessing Steps Completed}
+\subsection*{Preprocessing Steps}
 
 \begin{itemize}[noitemsep]
     \item Passage construction: document title concatenated with all sentences
@@ -143,7 +142,7 @@ implemented.
 \end{itemize}
 
 % ---------------------------------------------------------------
-\section{Literature Review Progress}
+\section{Literature Review}
 
 \paragraph{Dense Passage Retrieval (DPR) — Karpukhin et al., 2020.}
 DPR introduced bi-encoder retrieval where questions and passages are encoded
@@ -188,16 +187,15 @@ DPR model, following the finding in ANCE that BM25 negatives are a strong and
 computationally inexpensive source of hard negatives.
 
 % ---------------------------------------------------------------
-\section{Baseline Models or Prompting Strategies}
+\section{Baseline Models}
 
 \subsection*{Baseline 1: BM25}
 
 BM25 (Okapi BM25) is a classical probabilistic retrieval model based on term frequency
 and inverse document frequency. It requires no training and serves as a strong lexical
 baseline. We use the \texttt{rank\_bm25} Python library with lowercased,
-punctuation-removed tokenization.
-
-\textbf{Status: Fully implemented and evaluated.}
+punctuation-removed tokenization. Evaluation results on 500 validation examples are
+reported in Table~\ref{tab:results}.
 
 \subsection*{Baseline 2: Vanilla DPR}
 
@@ -206,8 +204,7 @@ We use the pretrained DPR encoders released by Facebook Research
 \texttt{facebook/dpr-ctx\_encoder-single-nq-base}), trained on Natural Questions.
 No fine-tuning is applied. This baseline measures off-the-shelf dense retrieval
 performance on HotpotQA without domain adaptation or hard negative training.
-
-\textbf{Status: Fully implemented and evaluated.}
+Evaluation results are reported alongside BM25 in Table~\ref{tab:results}.
 
 \subsection*{Why These Baselines}
 
@@ -224,13 +221,13 @@ HotpotQA validation split.
 
 \begin{table}[h]
 \centering
-\begin{tabular}{llllp{3.5cm}}
+\begin{tabular}{llll}
 \toprule
-\textbf{Model} & \textbf{Recall@5} & \textbf{F1} & \textbf{Exact Match} & \textbf{Status} \\
+\textbf{Model} & \textbf{Recall@5} & \textbf{F1} & \textbf{Exact Match} \\
 \midrule
-BM25                    & 0.972 & 0.060 & 0.004 & Complete \\
-DPR (vanilla)           & 0.982 & 0.064 & 0.002 & Complete \\
-DPR + Hard Negatives    & —     & —     & —     & Planned \\
+BM25                    & 0.972 & 0.060 & 0.004 \\
+DPR (Vanilla)           & 0.982 & 0.064 & 0.002 \\
+DPR + Hard Negatives    & —     & —     & —     \\
 \bottomrule
 \end{tabular}
 \caption{Retrieval results on HotpotQA validation (500 examples, top-k=5)}
@@ -241,16 +238,24 @@ DPR + Hard Negatives    & —     & —     & —     & Planned \\
 \subsection*{Interpretation}
 
 BM25 achieves a Recall@5 of 0.972, meaning it successfully retrieves at least one
-gold passage in the top 5 results for 97.2\% of questions. The low F1 (0.060) and
-Exact Match (0.004) scores reflect the absence of a reader component: the predicted
-answer is approximated as the first sentence of the top retrieved passage, which is
-rarely a short exact-match string. These scores will improve once a reader model or
-LLM is integrated in the next phase.
+gold passage in the top 5 results for 97.2\% of questions. Vanilla DPR achieves
+0.982, a marginal improvement of 1.0 percentage points. This gap is expected to be
+small: the DPR model used here was pretrained on Natural Questions, not HotpotQA,
+so no domain adaptation has been applied. The improvement demonstrates that even
+off-the-shelf dense retrieval outperforms lexical matching on this dataset; we
+expect a larger gain once the encoders are fine-tuned with hard negatives on the
+HotpotQA training split.
+
+The low F1 (0.060) and Exact Match (0.004) scores reflect the absence of a reader
+component: the predicted answer is approximated as the first sentence of the top
+retrieved passage, which is rarely a short exact-match string. These scores will
+improve once a reader model or LLM is integrated in the next phase.
+
 F1 and EM scores are therefore not meaningful at this stage and are reported only
 for completeness.
 
 % ---------------------------------------------------------------
-\section{Planned Improvements and Technical Direction}
+\section{Methodology and Implementation Progress}
 
 The core contribution of this project is training a DPR model with hard negative mining.
 The planned pipeline proceeds as follows:
@@ -259,7 +264,10 @@ The planned pipeline proceeds as follows:
     \item \textbf{Hard Negative Generation (Completed):} BM25 was run on the training
           split to retrieve top-$k$ passages per question. Passages scoring highly under
           BM25 but not containing the gold answer were selected as hard negatives and
-          saved to \texttt{data/hard\_negatives.json} (1,000 training examples).
+          saved to \texttt{data/hard\_negatives.json}. The initial run covers 1,000
+          training examples as a proof-of-concept to validate the pipeline; full-scale
+          mining over the complete 90k training split will be performed prior to
+          fine-tuning on GPU.
     \item \textbf{DPR Fine-tuning:} Fine-tune the DPR question and context encoders
           using contrastive loss (in-batch negatives + hard negatives) on the HotpotQA
           training split (90k examples).
@@ -270,7 +278,7 @@ The planned pipeline proceeds as follows:
 \end{enumerate}
 
 % ---------------------------------------------------------------
-\section{Ablation or Prompt Sensitivity Plan}
+\section{Ablation Study Design}
 
 We plan the following ablations to isolate the contribution of each component:
 
@@ -293,7 +301,7 @@ A5 & With reader vs.\ without reader: retrieval-only vs.\ full RAG \\
 % ---------------------------------------------------------------
 \section{Error Analysis and Generation Quality Analysis}
 
-\subsection*{Planned Error Analysis}
+\subsection*{Error Analysis Plan}
 
 We will sample 50 failure cases from each baseline and categorize them as follows:
 
@@ -308,9 +316,9 @@ We will sample 50 failure cases from each baseline and categorize them as follow
           does not contain an explicit yes/no signal.
 \end{itemize}
 
-\subsection*{Generation Quality Plan}
+\subsection*{Generation Quality Evaluation}
 
-Once the reader is integrated, we will evaluate:
+Once the reader is integrated, we will evaluate
 factual correctness relative to gold answers, fluency of generated answers, and
 hallucination rate (answers not grounded in retrieved passages).
 
@@ -333,7 +341,7 @@ include:
 \end{itemize}
 
 % ---------------------------------------------------------------
-\section{GitHub and Reproducibility Status}
+\section{GitHub Repository and Reproducibility}
 
 \textbf{Repository:}
 \url{https://github.com/ahmet-yilmaz-cs/CENG467_Term_Project}
@@ -342,19 +350,19 @@ include:
 
 \begin{lstlisting}
 CENG467_Term_Project/
-├── src/
-│   ├── load_dataset.py         # HotpotQA loading and inspection
-│   ├── baseline_bm25.py        # BM25 retrieval baseline
-│   ├── baseline_dpr.py         # DPR retrieval baseline
-│   └── hard_negative_mining.py # BM25-based hard negative generation
-├── results/
-│   └── bm25_results.json       # BM25 evaluation output
-├── data/
-│   └── hard_negatives.json     # Mined hard negatives (1,000 train examples)
-├── notebooks/                # Planned
-├── requirements.txt
-├── .gitignore
-└── README.md
++-- src/
+|   +-- load_dataset.py         # HotpotQA loading and inspection
+|   +-- baseline_bm25.py        # BM25 retrieval baseline
+|   +-- baseline_dpr.py         # DPR retrieval baseline
+|   +-- hard_negative_mining.py # BM25-based hard negative generation
++-- results/
+|   +-- bm25_results.json       # BM25 evaluation output
+|   +-- dpr_results.json        # DPR evaluation output
++-- data/
+|   +-- hard_negatives.json     # Mined hard negatives (1,000 train examples)
++-- requirements.txt
++-- .gitignore
++-- README.md
 \end{lstlisting}
 
 \subsection*{Reproducibility Instructions}
@@ -370,28 +378,6 @@ python src/baseline_bm25.py
 python src/baseline_dpr.py
 \end{lstlisting}
 
-\subsection*{Status Checklist}
-
-\begin{table}[h]
-\centering
-\begin{tabular}{ll}
-\toprule
-\textbf{Item} & \textbf{Status} \\
-\midrule
-GitHub repository       & Open (\url{https://github.com/ahmet-yilmaz-cs/CENG467_Term_Project}) \\
-\texttt{requirements.txt} & Done \\
-README                  & Done \\
-Dataset loading script  & Done \\
-BM25 baseline script    & Done \\
-DPR baseline script     & Done \\
-\texttt{results/bm25\_results.json} & Done \\
-\texttt{src/hard\_negative\_mining.py} & Done \\
-\texttt{data/hard\_negatives.json}     & Done \\
-Consistent commit history & In progress \\
-\bottomrule
-\end{tabular}
-\caption{Repository status checklist}
-\end{table}
 
 % ---------------------------------------------------------------
 \section{Current Challenges and Next Steps}
