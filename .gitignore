@@ -9,3 +9,5 @@ data/raw/
 *.pt
 *.bin
 .DS_Store
+models/
+data/hard_negatives_full.json
