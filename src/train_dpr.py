@@ -1,6 +1,5 @@
 import json
 import os
-import string
 
 import numpy as np
 import torch
@@ -148,10 +147,6 @@ def train(
 # Evaluation (Recall@5) using fine-tuned model
 # ---------------------------------------------------------------------------
 
-def normalize(text):
-    return text.lower().translate(str.maketrans("", "", string.punctuation)).strip()
-
-
 def evaluate_recall(model_dir="models/dpr_finetuned", max_samples=500, top_k=5):
     print(f"\nEvaluating fine-tuned model from {model_dir}...")
 
@@ -199,6 +194,19 @@ def evaluate_recall(model_dir="models/dpr_finetuned", max_samples=500, top_k=5):
     print(f"\n=== Fine-tuned DPR Results ===")
     print(f"  Recall@{top_k}: {recall:.4f}  ({hits}/{len(dataset)})")
     print(f"  (Vanilla DPR baseline: 0.982)")
+
+    os.makedirs("results", exist_ok=True)
+    output = {
+        "model": "DPR + Hard Negatives",
+        "model_dir": model_dir,
+        "num_samples": len(dataset),
+        "top_k": top_k,
+        f"Recall@{top_k}": round(recall, 4),
+    }
+    out_path = "results/dpr_hn_results.json"
+    with open(out_path, "w") as f:
+        json.dump(output, f, indent=2)
+    print(f"  Results saved to {out_path}")
     return recall
 
 
@@ -212,7 +220,7 @@ if __name__ == "__main__":
         output_dir="models/dpr_finetuned",
         max_samples=None,   # local test: set to 50; full run: None
         epochs=3,           # local test: set to 1
-        batch_size=4,       # CPU: set to 2-4; Colab T4 GPU: 8
+        batch_size=4,       # local CPU: 2-4; Colab T4 GPU: use 8 when calling train() directly
         lr=2e-5,
     )
     evaluate_recall(model_dir=model_dir, max_samples=500, top_k=5)
