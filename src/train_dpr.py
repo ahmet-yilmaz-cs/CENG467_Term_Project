@@ -62,8 +62,11 @@ def train(
     epochs=2,
     batch_size=4,
     lr=2e-5,
+    recall_eval_samples=500,
 ):
+    best_dir = os.path.join(output_dir, "best_model")
     os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(best_dir, exist_ok=True)
     print(f"Device: {device}")
 
     # Load encoders
@@ -82,6 +85,8 @@ def train(
     )
 
     data = load_hard_negatives(data_path, max_samples=max_samples)
+
+    best_recall = 0.0
 
     for epoch in range(epochs):
         total_loss = 0.0
@@ -133,14 +138,25 @@ def train(
         avg_loss = total_loss / steps
         print(f"  Epoch {epoch + 1} — avg loss: {avg_loss:.4f}")
 
-    # Save
-    print(f"\nSaving fine-tuned encoders to {output_dir}/")
-    q_encoder.save_pretrained(f"{output_dir}/question_encoder")
-    q_tokenizer.save_pretrained(f"{output_dir}/question_encoder")
-    c_encoder.save_pretrained(f"{output_dir}/context_encoder")
-    c_tokenizer.save_pretrained(f"{output_dir}/context_encoder")
-    print("Saved.")
-    return output_dir
+        # Save current epoch to output_dir, evaluate Recall@5, keep best
+        q_encoder.save_pretrained(f"{output_dir}/question_encoder")
+        q_tokenizer.save_pretrained(f"{output_dir}/question_encoder")
+        c_encoder.save_pretrained(f"{output_dir}/context_encoder")
+        c_tokenizer.save_pretrained(f"{output_dir}/context_encoder")
+
+        recall = evaluate_recall(model_dir=output_dir, max_samples=recall_eval_samples, top_k=5)
+
+        if recall > best_recall:
+            best_recall = recall
+            q_encoder.save_pretrained(f"{best_dir}/question_encoder")
+            q_tokenizer.save_pretrained(f"{best_dir}/question_encoder")
+            c_encoder.save_pretrained(f"{best_dir}/context_encoder")
+            c_tokenizer.save_pretrained(f"{best_dir}/context_encoder")
+            print(f"  ✓ Best model saved (Recall@5: {best_recall:.4f})")
+
+    print(f"\nTraining complete. Best Recall@5: {best_recall:.4f}")
+    print(f"Best model saved to {best_dir}/")
+    return best_dir
 
 
 # ---------------------------------------------------------------------------
