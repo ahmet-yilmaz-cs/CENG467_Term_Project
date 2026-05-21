@@ -63,18 +63,26 @@ def train(
     batch_size=4,
     lr=2e-5,
     recall_eval_samples=500,
+    resume_from=None,
 ):
     best_dir = os.path.join(output_dir, "best_model")
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(best_dir, exist_ok=True)
     print(f"Device: {device}")
 
-    # Load encoders
-    print("Loading encoders...")
-    q_tokenizer = DPRQuestionEncoderTokenizer.from_pretrained(QUESTION_MODEL)
-    q_encoder   = DPRQuestionEncoder.from_pretrained(QUESTION_MODEL).to(device)
-    c_tokenizer = DPRContextEncoderTokenizer.from_pretrained(CONTEXT_MODEL)
-    c_encoder   = DPRContextEncoder.from_pretrained(CONTEXT_MODEL).to(device)
+    # Load encoders — from checkpoint if resume_from is given, else from pretrained
+    if resume_from is not None:
+        print(f"Resuming from checkpoint: {resume_from}")
+        q_tokenizer = DPRQuestionEncoderTokenizer.from_pretrained(f"{resume_from}/question_encoder")
+        q_encoder   = DPRQuestionEncoder.from_pretrained(f"{resume_from}/question_encoder").to(device)
+        c_tokenizer = DPRContextEncoderTokenizer.from_pretrained(f"{resume_from}/context_encoder")
+        c_encoder   = DPRContextEncoder.from_pretrained(f"{resume_from}/context_encoder").to(device)
+    else:
+        print("Loading encoders...")
+        q_tokenizer = DPRQuestionEncoderTokenizer.from_pretrained(QUESTION_MODEL)
+        q_encoder   = DPRQuestionEncoder.from_pretrained(QUESTION_MODEL).to(device)
+        c_tokenizer = DPRContextEncoderTokenizer.from_pretrained(CONTEXT_MODEL)
+        c_encoder   = DPRContextEncoder.from_pretrained(CONTEXT_MODEL).to(device)
 
     q_encoder.train()
     c_encoder.train()
