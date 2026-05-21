@@ -62,6 +62,8 @@ def train(
     epochs=2,
     batch_size=4,
     lr=2e-5,
+    val_path="data/hard_negatives.json",
+    val_samples=200,
 ):
     os.makedirs(output_dir, exist_ok=True)
     print(f"Device: {device}")
@@ -81,7 +83,10 @@ def train(
         lr=lr,
     )
 
-    data = load_hard_negatives(data_path, max_samples=max_samples)
+    data     = load_hard_negatives(data_path, max_samples=max_samples)
+    val_data = load_hard_negatives(val_path, max_samples=val_samples)
+    print(f"  Validation set: {len(val_data)} examples")
+    best_val_loss = float("inf")
 
     for epoch in range(epochs):
         total_loss = 0.0
@@ -131,15 +136,52 @@ def train(
             steps += 1
 
         avg_loss = total_loss / steps
-        print(f"  Epoch {epoch + 1} — avg loss: {avg_loss:.4f}")
 
-    # Save
-    print(f"\nSaving fine-tuned encoders to {output_dir}/")
-    q_encoder.save_pretrained(f"{output_dir}/question_encoder")
-    q_tokenizer.save_pretrained(f"{output_dir}/question_encoder")
-    c_encoder.save_pretrained(f"{output_dir}/context_encoder")
-    c_tokenizer.save_pretrained(f"{output_dir}/context_encoder")
-    print("Saved.")
+        # Validation loss
+        q_encoder.eval()
+        c_encoder.eval()
+        val_total = 0.0
+        val_steps = 0
+        with torch.no_grad():
+            for vstart in range(0, len(val_data), batch_size):
+                vbatch = val_data[vstart:vstart + batch_size]
+                vbs = len(vbatch)
+                vquestions = [ex["question"] for ex in vbatch]
+                vpositives  = [
+                    ex["positive_passages"][0]["title"] + " " + ex["positive_passages"][0]["text"]
+                    for ex in vbatch
+                ]
+                vhard_negs = [
+                    p["title"] + " " + p["text"]
+                    for ex in vbatch
+                    for p in ex["hard_negatives"]
+                ]
+                vq_inputs = q_tokenizer(vquestions, return_tensors="pt",
+                                        truncation=True, max_length=64, padding=True).to(device)
+                vp_inputs = c_tokenizer(vpositives + vhard_negs, return_tensors="pt",
+                                        truncation=True, max_length=256, padding=True).to(device)
+                vq_embs = q_encoder(**vq_inputs).pooler_output
+                vp_embs = c_encoder(**vp_inputs).pooler_output
+                vloss = contrastive_loss(vq_embs, vp_embs, vbs)
+                val_total += vloss.item()
+                val_steps += 1
+        q_encoder.train()
+        c_encoder.train()
+
+        val_loss = val_total / val_steps
+        print(f"  Epoch {epoch + 1} — train loss: {avg_loss:.4f} | val loss: {val_loss:.4f}")
+
+        # Save best model checkpoint
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            q_encoder.save_pretrained(f"{output_dir}/question_encoder")
+            q_tokenizer.save_pretrained(f"{output_dir}/question_encoder")
+            c_encoder.save_pretrained(f"{output_dir}/context_encoder")
+            c_tokenizer.save_pretrained(f"{output_dir}/context_encoder")
+            print(f"  ✓ Best model saved (val loss: {val_loss:.4f})")
+
+    print(f"\nTraining complete. Best val loss: {best_val_loss:.4f}")
+    print(f"Best model saved to {output_dir}/")
     return output_dir
 
 

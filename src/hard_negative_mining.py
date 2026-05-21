@@ -81,8 +81,8 @@ def mine_hard_negatives(example, num_hard_negatives=5):
     }
 
 
-def run_mining(max_samples=1000, num_hard_negatives=5, output_path="data/hard_negatives.json"):
-    dataset = load_hotpotqa(split="train", max_samples=max_samples)
+def run_mining(max_samples=1000, num_hard_negatives=5, output_path="data/hard_negatives.json", split="train"):
+    dataset = load_hotpotqa(split=split, max_samples=max_samples)
 
     results  = []
     skipped  = 0
