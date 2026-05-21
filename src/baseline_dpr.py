@@ -136,6 +136,7 @@ def run_dpr_baseline(max_samples=500, top_k=5):
     for k, v in metrics.items():
         print(f"  {k}: {v}")
 
+    os.makedirs("results", exist_ok=True)
     with open("results/dpr_results.json", "w") as f:
         json.dump({"metrics": metrics, "predictions": results[:50]}, f, indent=2)
 
