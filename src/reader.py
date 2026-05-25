@@ -8,9 +8,9 @@ import torch
 from tqdm import tqdm
 from transformers import (
     DPRContextEncoder,
-    DPRContextEncoderTokenizer,
+    DPRContextEncoderTokenizerFast,
     DPRQuestionEncoder,
-    DPRQuestionEncoderTokenizer,
+    DPRQuestionEncoderTokenizerFast,
     pipeline,
 )
 
@@ -85,9 +85,9 @@ def load_dpr_encoders(model_dir=None):
         q_enc_path = VANILLA_Q_MODEL
         c_enc_path = VANILLA_C_MODEL
 
-    q_tokenizer = DPRQuestionEncoderTokenizer.from_pretrained(q_enc_path)
+    q_tokenizer = DPRQuestionEncoderTokenizerFast.from_pretrained(q_enc_path)
     q_encoder   = DPRQuestionEncoder.from_pretrained(q_enc_path).to(device).eval()
-    c_tokenizer = DPRContextEncoderTokenizer.from_pretrained(c_enc_path)
+    c_tokenizer = DPRContextEncoderTokenizerFast.from_pretrained(c_enc_path)
     c_encoder   = DPRContextEncoder.from_pretrained(c_enc_path).to(device).eval()
     return q_tokenizer, q_encoder, c_tokenizer, c_encoder
 
