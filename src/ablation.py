@@ -39,7 +39,7 @@ from load_dataset import load_hotpotqa
 
 VANILLA_Q_MODEL = "facebook/dpr-question_encoder-single-nq-base"
 VANILLA_C_MODEL = "facebook/dpr-ctx_encoder-single-nq-base"
-QA_MODEL        = "deepset/roberta-base-squad2"
+QA_MODEL        = "google/flan-t5-xl"
 
 device    = "cuda" if torch.cuda.is_available() else "cpu"
 device_id = 0 if torch.cuda.is_available() else -1
@@ -155,13 +155,16 @@ def retrieve_dpr(question, faiss_index, passages, q_tokenizer, q_encoder, top_k)
 # ---------------------------------------------------------------------------
 
 def read(question, top_passages, qa_pipe):
-    best_answer, best_score = "", -1.0
-    for p in top_passages:
-        result = qa_pipe(question=question, context=p["title"] + " " + p["text"])
-        if result["score"] > best_score:
-            best_score  = result["score"]
-            best_answer = result["answer"]
-    return best_answer
+    context = " ".join([p["title"] + " " + p["text"] for p in top_passages])
+    context = context[:2000]
+    prompt  = (
+        f"Answer the question based on the context below.\n"
+        f"Context: {context}\n"
+        f"Question: {question}\n"
+        f"Answer:"
+    )
+    result = qa_pipe(prompt, max_new_tokens=50, do_sample=False)
+    return result[0]["generated_text"].strip()
 
 
 # ---------------------------------------------------------------------------
@@ -233,7 +236,7 @@ def run_ablation(
 
     # Load reader once — shared across all configs
     print(f"Loading QA reader ({QA_MODEL})...")
-    qa_pipe = pipeline("question-answering", model=QA_MODEL, device=device_id)
+    qa_pipe = pipeline("text2text-generation", model=QA_MODEL, device=device_id)
 
     all_metrics = []
 

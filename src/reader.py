@@ -17,10 +17,10 @@ from transformers import (
 from load_dataset import load_hotpotqa
 
 # ---------------------------------------------------------------------------
-# QA model — extractive reader
+# QA model — generative reader (Flan-T5-xl)
 # ---------------------------------------------------------------------------
 
-QA_MODEL = "deepset/roberta-base-squad2"
+QA_MODEL = "google/flan-t5-xl"
 
 # DPR fallback (vanilla) if fine-tuned model is not available
 VANILLA_Q_MODEL = "facebook/dpr-question_encoder-single-nq-base"
@@ -153,20 +153,21 @@ def retrieve(question, faiss_index, passages, q_tokenizer, q_encoder, top_k=3):
 
 def read(question, top_passages, qa_pipeline):
     """
-    Run the QA model on each retrieved passage and return the answer with
-    the highest confidence score across all passages.
+    Run Flan-T5-xl on the concatenated top passages and return the generated answer.
+    All retrieved passages are joined into a single context for the generative reader.
     """
-    best_answer = ""
-    best_score  = -1.0
-
-    for passage in top_passages:
-        context = passage["title"] + " " + passage["text"]
-        result  = qa_pipeline(question=question, context=context)
-        if result["score"] > best_score:
-            best_score  = result["score"]
-            best_answer = result["answer"]
-
-    return best_answer, best_score
+    context = " ".join([p["title"] + " " + p["text"] for p in top_passages])
+    # Truncate context to avoid exceeding model input limits
+    context = context[:2000]
+    prompt  = (
+        f"Answer the question based on the context below.\n"
+        f"Context: {context}\n"
+        f"Question: {question}\n"
+        f"Answer:"
+    )
+    result = qa_pipeline(prompt, max_new_tokens=50, do_sample=False)
+    answer = result[0]["generated_text"].strip()
+    return answer, 1.0  # score placeholder for API compatibility
 
 
 # ---------------------------------------------------------------------------
@@ -187,7 +188,7 @@ def run_reader_pipeline(
 
     # Load QA reader
     print(f"Loading QA reader ({QA_MODEL})...")
-    qa = pipeline("question-answering", model=QA_MODEL, device=device_id)
+    qa = pipeline("text2text-generation", model=QA_MODEL, device=device_id)
     print("  Reader loaded.")
 
     dataset = load_hotpotqa(split="validation", max_samples=max_samples)
@@ -238,7 +239,7 @@ def run_reader_pipeline(
 
     n = len(dataset)
     metrics = {
-        "model":             "DPR + FAISS + Reader (roberta-base-squad2)",
+        "model":             "DPR + FAISS + Reader (flan-t5-xl)",
         "retriever":         model_dir if os.path.isdir(str(model_dir)) else "vanilla DPR",
         "num_samples":       n,
         "corpus_size":       len(all_passages),
