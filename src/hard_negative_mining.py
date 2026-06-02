@@ -139,9 +139,9 @@ def run_mining(
 
 if __name__ == "__main__":
     run_mining(
-        max_samples=1000,
+        max_samples=30000,
         num_hard_negatives=5,
-        output_path="data/hard_negatives_train.json",
+        output_path="/content/drive/MyDrive/CENG467/hard_negatives_train_30k.json",
         val_ratio=0.2,
-        val_output_path="data/hard_negatives_val.json",
+        val_output_path="/content/drive/MyDrive/CENG467/hard_negatives_val_30k.json",
     )

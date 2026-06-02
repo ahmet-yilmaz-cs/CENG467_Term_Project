@@ -222,9 +222,9 @@ def run_ablation(
 ):
     if dpr_model_dirs is None:
         dpr_model_dirs = {
-            "DPR (vanilla)": None,
-            "DPR + HN 5k":   "models/dpr_finetuned_5k",
-            "DPR + HN 30k":  "models/dpr_finetuned_30k/best_model",
+            "DPR (vanilla)":  None,
+            "DPR + HN 5k":    "models/dpr_finetuned_5k/best_model",
+            "DPR + HN 30k":   "models/dpr_finetuned_30k/best_model",
         }
 
     print(f"Device: {device}")
@@ -292,9 +292,9 @@ if __name__ == "__main__":
         max_samples    = 500,
         top_k_list     = [1, 3, 5],
         dpr_model_dirs = {
-            "DPR (vanilla)": None,
-            "DPR + HN 5k":   "models/dpr_finetuned_5k",
-            "DPR + HN 30k":  "models/dpr_finetuned_30k/best_model",
+            "DPR (vanilla)":  None,
+            "DPR + HN 5k":    "models/dpr_finetuned_5k/best_model",
+            "DPR + HN 30k":   "models/dpr_finetuned_30k/best_model",
         },
         output_path = "results/ablation_results.json",
     )

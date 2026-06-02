@@ -13,7 +13,6 @@ from transformers import (
     get_linear_schedule_with_warmup,
 )
 
-from load_dataset import load_hotpotqa
 
 QUESTION_MODEL = "facebook/dpr-question_encoder-single-nq-base"
 CONTEXT_MODEL = "facebook/dpr-ctx_encoder-single-nq-base"
@@ -65,6 +64,7 @@ def train(
     lr=2e-5,
     recall_eval_samples=200,
     resume_from=None,
+    val_path="data/hard_negatives_val.json",
 ):
     best_dir = os.path.join(output_dir, "best_model")
     os.makedirs(output_dir, exist_ok=True)
@@ -170,7 +170,7 @@ def train(
         c_encoder.save_pretrained(f"{output_dir}/context_encoder")
         c_tokenizer.save_pretrained(f"{output_dir}/context_encoder")
 
-        metrics = evaluate_recall(model_dir=output_dir, max_samples=recall_eval_samples)
+        metrics = evaluate_recall(model_dir=output_dir, max_samples=recall_eval_samples, val_path=val_path)
 
         if metrics["MRR@10"] > best_score:
             best_score = metrics["MRR@10"]
@@ -190,10 +190,10 @@ def train(
 # ---------------------------------------------------------------------------
 
 def evaluate_recall(model_dir="models/dpr_finetuned", max_samples=200,
-                    split="train", start=800):
+                    val_path="data/hard_negatives_val.json"):
     """
-    Evaluates retrieval quality on a held-out slice of the HotpotQA train split
-    (default: examples 800-999).  This set was never used for training, so it
+    Evaluates retrieval quality on the held-out hard-negatives validation set
+    (hard_negatives_val.json). This set is never used during training, so it
     provides an unbiased signal for checkpoint selection.
 
     Final ablation evaluation is performed separately on the HotpotQA
@@ -201,14 +201,17 @@ def evaluate_recall(model_dir="models/dpr_finetuned", max_samples=200,
 
     Returns a dict with Recall@1, Recall@5, Recall@10, MRR@10, nDCG@10.
     """
-    print(f"\nEvaluating {model_dir} on {split}[{start}:{start + max_samples}]...")
+    print(f"\nEvaluating {model_dir} on {val_path} (max {max_samples} samples)...")
 
     q_tokenizer = DPRQuestionEncoderTokenizer.from_pretrained(f"{model_dir}/question_encoder")
     q_encoder   = DPRQuestionEncoder.from_pretrained(f"{model_dir}/question_encoder").to(device).eval()
     c_tokenizer = DPRContextEncoderTokenizer.from_pretrained(f"{model_dir}/context_encoder")
     c_encoder   = DPRContextEncoder.from_pretrained(f"{model_dir}/context_encoder").to(device).eval()
 
-    dataset = load_hotpotqa(split=split, max_samples=max_samples, start=start)
+    with open(val_path) as f:
+        dataset = json.load(f)
+    if max_samples:
+        dataset = dataset[:max_samples]
 
     recall_counts = {1: 0, 5: 0, 10: 0}
     mrr_sum       = 0.0
@@ -217,12 +220,9 @@ def evaluate_recall(model_dir="models/dpr_finetuned", max_samples=200,
 
     for ex in tqdm(dataset, desc="Retrieval eval"):
         question    = ex["question"]
-        gold_titles = set(ex["supporting_facts"]["title"])
+        gold_titles = set(p["title"] for p in ex["positive_passages"])
 
-        passages = [
-            {"title": t, "text": " ".join(s)}
-            for t, s in zip(ex["context"]["title"], ex["context"]["sentences"])
-        ]
+        passages = ex["positive_passages"] + ex["hard_negatives"]
 
         q_inputs = q_tokenizer(
             question, return_tensors="pt", truncation=True, max_length=64,
@@ -299,5 +299,5 @@ if __name__ == "__main__":
         batch_size=4,       # local CPU: 2-4; A100: 16-32
         lr=2e-5,
     )
-    # Final evaluation on held-out val slice (train examples 800-999)
-    evaluate_recall(model_dir=model_dir, max_samples=200, split="train", start=800)
+    # Final evaluation on held-out hard-negatives validation set
+    evaluate_recall(model_dir=model_dir, max_samples=200, val_path="data/hard_negatives_val.json")
