@@ -274,7 +274,7 @@ def evaluate_recall(model_dir="models/dpr_finetuned", max_samples=200,
         "nDCG@10":   round(ndcg_sum / n, 4),
     }
 
-    print(f"\n=== Retrieval Metrics ({split}[{start}:{start + max_samples}]) ===")
+    print(f"\n=== Retrieval Metrics ({val_path}, n={n}) ===")
     for k, v in metrics.items():
         print(f"  {k}: {v}")
 
