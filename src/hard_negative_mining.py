@@ -1,4 +1,5 @@
 import json
+import os
 import string
 from tqdm import tqdm
 from rank_bm25 import BM25Okapi
@@ -81,11 +82,25 @@ def mine_hard_negatives(example, num_hard_negatives=5):
     }
 
 
-def run_mining(max_samples=1000, num_hard_negatives=5, output_path="data/hard_negatives.json"):
+def run_mining(
+    max_samples=1000,
+    num_hard_negatives=5,
+    output_path="data/hard_negatives_train.json",
+    val_ratio=0.2,
+    val_output_path="data/hard_negatives_val.json",
+):
+    """
+    Mines hard negatives from the HotpotQA train split and explicitly
+    splits the results into a training set and a held-out validation set.
+
+    val_ratio : fraction of mined examples reserved for held-out validation
+                (used for checkpoint selection in train_dpr.py, never for
+                final ablation evaluation).
+    """
     dataset = load_hotpotqa(split="train", max_samples=max_samples)
 
-    results  = []
-    skipped  = 0
+    results = []
+    skipped = 0
 
     for example in tqdm(dataset, desc="Mining hard negatives"):
         sample = mine_hard_negatives(example, num_hard_negatives=num_hard_negatives)
@@ -98,12 +113,35 @@ def run_mining(max_samples=1000, num_hard_negatives=5, output_path="data/hard_ne
     print(f"Avg hard negatives per sample: "
           f"{sum(len(r['hard_negatives']) for r in results) / len(results):.2f}")
 
-    with open(output_path, "w") as f:
-        json.dump(results, f, indent=2, ensure_ascii=False)
+    # ------------------------------------------------------------------ #
+    # Explicit train / validation split at the mining stage.              #
+    # Checkpoint selection (train_dpr.py) uses the val portion;           #
+    # final ablation evaluation uses the HotpotQA validation split,       #
+    # which is completely independent of both sets below.                 #
+    # ------------------------------------------------------------------ #
+    n_val         = int(len(results) * val_ratio)
+    n_train       = len(results) - n_val
+    train_results = results[:n_train]
+    val_results   = results[n_train:]
 
-    print(f"Saved to {output_path}")
-    return results
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+
+    with open(output_path, "w") as f:
+        json.dump(train_results, f, indent=2, ensure_ascii=False)
+    print(f"Train set ({len(train_results)} examples) saved to {output_path}")
+
+    with open(val_output_path, "w") as f:
+        json.dump(val_results, f, indent=2, ensure_ascii=False)
+    print(f"Val   set ({len(val_results)} examples) saved to {val_output_path}")
+
+    return train_results, val_results
 
 
 if __name__ == "__main__":
-    run_mining(max_samples=1000, num_hard_negatives=5, output_path="data/hard_negatives.json")
+    run_mining(
+        max_samples=1000,
+        num_hard_negatives=5,
+        output_path="data/hard_negatives_train.json",
+        val_ratio=0.2,
+        val_output_path="data/hard_negatives_val.json",
+    )
