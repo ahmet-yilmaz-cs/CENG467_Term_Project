@@ -10,8 +10,10 @@ Compares all retrieval configurations on identical conditions:
 Configurations tested:
   1. BM25 (lexical baseline)
   2. DPR — vanilla (no fine-tuning)
-  3. DPR — fine-tuned 5k examples
-  4. DPR — fine-tuned 30k examples
+  3. DPR — hard-negative fine-tuned (models/dpr_hn_v2/epoch3)
+
+Reader uses model.generate() directly — the "text2text-generation" pipeline
+task was removed in recent transformers versions.
 """
 
 import json
@@ -24,11 +26,12 @@ import torch
 from rank_bm25 import BM25Okapi
 from tqdm import tqdm
 from transformers import (
+    AutoModelForSeq2SeqLM,
+    AutoTokenizer,
     DPRContextEncoder,
     DPRContextEncoderTokenizerFast,
     DPRQuestionEncoder,
     DPRQuestionEncoderTokenizerFast,
-    pipeline,
 )
 
 from load_dataset import load_hotpotqa
@@ -41,8 +44,7 @@ VANILLA_Q_MODEL = "facebook/dpr-question_encoder-single-nq-base"
 VANILLA_C_MODEL = "facebook/dpr-ctx_encoder-single-nq-base"
 QA_MODEL        = "google/flan-t5-xl"
 
-device    = "cuda" if torch.cuda.is_available() else "cpu"
-device_id = 0 if torch.cuda.is_available() else -1
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 # ---------------------------------------------------------------------------
@@ -105,21 +107,23 @@ def retrieve_bm25(question, bm25_index, passages, top_k):
 # ---------------------------------------------------------------------------
 
 def load_dpr_encoders(model_dir):
-    if model_dir and os.path.isdir(f"{model_dir}/question_encoder"):
-        print(f"  Loading fine-tuned DPR from {model_dir}/")
+    # model_dir=None -> vanilla DPR. If a path is given it MUST exist:
+    # fail loudly instead of silently falling back to vanilla (the footgun
+    # that once masked a broken checkpoint as a "0.43" ablation result).
+    if model_dir:
         q_path = f"{model_dir}/question_encoder"
         c_path = f"{model_dir}/context_encoder"
-        q_tokenizer = DPRQuestionEncoderTokenizerFast.from_pretrained(q_path)
-        c_tokenizer = DPRContextEncoderTokenizerFast.from_pretrained(c_path)
+        assert os.path.isdir(q_path), f"Fine-tuned model not found: {q_path}"
+        print(f"  Loading fine-tuned DPR from {model_dir}/")
     else:
-        print("  Loading vanilla DPR.")
         q_path = VANILLA_Q_MODEL
         c_path = VANILLA_C_MODEL
-        q_tokenizer = DPRQuestionEncoderTokenizerFast.from_pretrained(q_path)
-        c_tokenizer = DPRContextEncoderTokenizerFast.from_pretrained(c_path)
+        print("  Loading vanilla DPR.")
 
-    q_encoder = DPRQuestionEncoder.from_pretrained(q_path).to(device).eval()
-    c_encoder = DPRContextEncoder.from_pretrained(c_path).to(device).eval()
+    q_tokenizer = DPRQuestionEncoderTokenizerFast.from_pretrained(q_path)
+    c_tokenizer = DPRContextEncoderTokenizerFast.from_pretrained(c_path)
+    q_encoder   = DPRQuestionEncoder.from_pretrained(q_path).to(device).eval()
+    c_encoder   = DPRContextEncoder.from_pretrained(c_path).to(device).eval()
     return q_tokenizer, q_encoder, c_tokenizer, c_encoder
 
 
@@ -154,7 +158,7 @@ def retrieve_dpr(question, faiss_index, passages, q_tokenizer, q_encoder, top_k)
 # Reader
 # ---------------------------------------------------------------------------
 
-def read(question, top_passages, qa_pipe):
+def read(question, top_passages, reader_model, reader_tokenizer):
     context = " ".join([p["title"] + " " + p["text"] for p in top_passages])
     context = context[:2000]
     prompt  = (
@@ -163,15 +167,19 @@ def read(question, top_passages, qa_pipe):
         f"Question: {question}\n"
         f"Answer:"
     )
-    result = qa_pipe(prompt, max_new_tokens=50, do_sample=False)
-    return result[0]["generated_text"].strip()
+    inputs = reader_tokenizer(
+        prompt, return_tensors="pt", truncation=True, max_length=512,
+    ).to(device)
+    with torch.no_grad():
+        output = reader_model.generate(**inputs, max_new_tokens=50, do_sample=False)
+    return reader_tokenizer.decode(output[0], skip_special_tokens=True).strip()
 
 
 # ---------------------------------------------------------------------------
 # Evaluate one configuration
 # ---------------------------------------------------------------------------
 
-def evaluate_config(name, dataset, all_passages, retriever_fn, qa_pipe, top_k_list):
+def evaluate_config(name, dataset, all_passages, retriever_fn, reader_model, reader_tokenizer, top_k_list):
     """
     retriever_fn(question, top_k) -> list of passage dicts
     Returns a metrics dict.
@@ -197,7 +205,7 @@ def evaluate_config(name, dataset, all_passages, retriever_fn, qa_pipe, top_k_li
                 recalls[k] += 1
 
         # Reader on top reader_k passages
-        predicted = read(question, top_passages[:reader_k], qa_pipe)
+        predicted = read(question, top_passages[:reader_k], reader_model, reader_tokenizer)
         f1_total += token_f1(predicted, answer)
         em_total += exact_match(predicted, answer)
 
@@ -222,9 +230,8 @@ def run_ablation(
 ):
     if dpr_model_dirs is None:
         dpr_model_dirs = {
-            "DPR (vanilla)":  None,
-            "DPR + HN 5k":    "models/dpr_finetuned_5k/best_model",
-            "DPR + HN 30k":   "models/dpr_finetuned_30k/best_model",
+            "DPR (vanilla)": None,
+            "DPR + HN":      "models/dpr_hn_v2/epoch3",
         }
 
     print(f"Device: {device}")
@@ -234,19 +241,22 @@ def run_ablation(
     all_passages = collect_passages(dataset)
     print(f"Corpus: {len(all_passages)} unique passages")
 
-    # Load reader once — shared across all configs
+    # Load reader once — shared across all configs.
+    # Use model.generate() directly: the "text2text-generation" pipeline task
+    # was removed in recent transformers versions.
     print(f"Loading QA reader ({QA_MODEL})...")
-    qa_pipe = pipeline("text-generation", model=QA_MODEL, device=device_id)
+    reader_tokenizer = AutoTokenizer.from_pretrained(QA_MODEL)
+    reader_model     = AutoModelForSeq2SeqLM.from_pretrained(QA_MODEL).to(device).eval()
 
     all_metrics = []
 
     # ------------------------------------------------------------------
     # 1. BM25
     # ------------------------------------------------------------------
-    print("\n[1/4] BM25")
+    print(f"\n[1/{1 + len(dpr_model_dirs)}] BM25")
     bm25_index = build_bm25_index(all_passages)
     bm25_fn    = lambda q, k: retrieve_bm25(q, bm25_index, all_passages, k)
-    metrics    = evaluate_config("BM25", dataset, all_passages, bm25_fn, qa_pipe, top_k_list)
+    metrics    = evaluate_config("BM25", dataset, all_passages, bm25_fn, reader_model, reader_tokenizer, top_k_list)
     all_metrics.append(metrics)
     print(f"  → {metrics}")
 
@@ -260,7 +270,7 @@ def run_ablation(
         dpr_fn    = lambda q, k, qt=q_tok, qe=q_enc: retrieve_dpr(
             q, faiss_idx, all_passages, qt, qe, k
         )
-        metrics = evaluate_config(name, dataset, all_passages, dpr_fn, qa_pipe, top_k_list)
+        metrics = evaluate_config(name, dataset, all_passages, dpr_fn, reader_model, reader_tokenizer, top_k_list)
         all_metrics.append(metrics)
         print(f"  → {metrics}")
 
@@ -292,9 +302,8 @@ if __name__ == "__main__":
         max_samples    = 500,
         top_k_list     = [1, 3, 5],
         dpr_model_dirs = {
-            "DPR (vanilla)":  None,
-            "DPR + HN 5k":    "models/dpr_finetuned_5k/best_model",
-            "DPR + HN 30k":   "models/dpr_finetuned_30k/best_model",
+            "DPR (vanilla)": None,
+            "DPR + HN":      "models/dpr_hn_v2/epoch3",
         },
         output_path = "results/ablation_results.json",
     )

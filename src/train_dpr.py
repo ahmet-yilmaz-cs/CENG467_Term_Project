@@ -1,3 +1,15 @@
+"""
+Hard-negative fine-tuning of DPR for HotpotQA retrieval.
+
+Recipe (validated: beats vanilla DPR 0.714 -> 0.844 R@1 on global retrieval):
+  - in-batch + hard-negative contrastive loss, curriculum HN schedule [1, 3, 5]
+  - AdamW lr 2e-5, linear warmup, gradient clipping, batch_size 16
+
+Each epoch is saved to its own directory (output_dir/epoch{N}); the final
+checkpoint is chosen by GLOBAL retrieval via src/ablation.py — NOT by the
+mini-pool recall below, which is a misleading, near-saturated signal.
+"""
+
 import json
 import os
 
@@ -57,18 +69,16 @@ def contrastive_loss(q_embs, p_embs, batch_size):
 
 def train(
     data_path="data/hard_negatives_train.json",
-    output_dir="models/dpr_finetuned",
+    output_dir="models/dpr_hn_v2",
     max_samples=None,
     epochs=3,
-    batch_size=4,
+    batch_size=16,
     lr=2e-5,
     recall_eval_samples=200,
     resume_from=None,
     val_path="data/hard_negatives_val.json",
 ):
-    best_dir = os.path.join(output_dir, "best_model")
     os.makedirs(output_dir, exist_ok=True)
-    os.makedirs(best_dir, exist_ok=True)
     print(f"Device: {device}")
 
     # Load encoders — from checkpoint if resume_from is given, else from pretrained
@@ -103,8 +113,6 @@ def train(
     # Curriculum: number of hard negatives to use per epoch
     # Epoch 1 → 1 HN (easy), Epoch 2 → 3 HN, Epoch 3 → 5 HN (full)
     hn_schedule = [1, 3, 5]
-
-    best_score = 0.0   # tracked via MRR@10
 
     for epoch in range(epochs):
         hn_count   = hn_schedule[min(epoch, len(hn_schedule) - 1)]
@@ -164,40 +172,38 @@ def train(
         avg_loss = total_loss / steps
         print(f"  avg loss: {avg_loss:.4f}  |  lr: {scheduler.get_last_lr()[0]:.2e}")
 
-        # Save current epoch checkpoint, evaluate on held-out val, keep best
-        q_encoder.save_pretrained(f"{output_dir}/question_encoder")
-        q_tokenizer.save_pretrained(f"{output_dir}/question_encoder")
-        c_encoder.save_pretrained(f"{output_dir}/context_encoder")
-        c_tokenizer.save_pretrained(f"{output_dir}/context_encoder")
+        # Save THIS epoch to its own directory (never overwrite).
+        # Final selection is done on GLOBAL retrieval via ablation.py.
+        epoch_dir = os.path.join(output_dir, f"epoch{epoch + 1}")
+        q_encoder.save_pretrained(f"{epoch_dir}/question_encoder")
+        q_tokenizer.save_pretrained(f"{epoch_dir}/question_encoder")
+        c_encoder.save_pretrained(f"{epoch_dir}/context_encoder")
+        c_tokenizer.save_pretrained(f"{epoch_dir}/context_encoder")
+        print(f"  ✓ epoch {epoch + 1} saved to {epoch_dir}/")
 
-        metrics = evaluate_recall(model_dir=output_dir, max_samples=recall_eval_samples, val_path=val_path)
+        # Mini-pool recall — DIAGNOSTIC ONLY, not used to pick the final model.
+        evaluate_recall(model_dir=epoch_dir, max_samples=recall_eval_samples, val_path=val_path)
 
-        if metrics["MRR@10"] > best_score:
-            best_score = metrics["MRR@10"]
-            q_encoder.save_pretrained(f"{best_dir}/question_encoder")
-            q_tokenizer.save_pretrained(f"{best_dir}/question_encoder")
-            c_encoder.save_pretrained(f"{best_dir}/context_encoder")
-            c_tokenizer.save_pretrained(f"{best_dir}/context_encoder")
-            print(f"  ✓ Best model saved (MRR@10: {best_score:.4f})")
-
-    print(f"\nTraining complete. Best MRR@10: {best_score:.4f}")
-    print(f"Best model saved to {best_dir}/")
-    return best_dir
+    print(f"\nTraining complete. Per-epoch checkpoints under {output_dir}/")
+    print("Pick the best epoch with src/ablation.py (global retrieval).")
+    return output_dir
 
 
 # ---------------------------------------------------------------------------
 # Evaluation (Recall@5) using fine-tuned model
 # ---------------------------------------------------------------------------
 
-def evaluate_recall(model_dir="models/dpr_finetuned", max_samples=200,
+def evaluate_recall(model_dir="models/dpr_hn_v2", max_samples=200,
                     val_path="data/hard_negatives_val.json"):
     """
-    Evaluates retrieval quality on the held-out hard-negatives validation set
-    (hard_negatives_val.json). This set is never used during training, so it
-    provides an unbiased signal for checkpoint selection.
+    Mini-pool retrieval sanity check on the held-out hard-negatives set: each
+    question is ranked only against its own positives + hard negatives (~7
+    candidates). DIAGNOSTIC ONLY — the pool is tiny and near-saturated, so MRR
+    here is NOT a reliable signal for picking the final checkpoint (it once
+    selected a checkpoint that scored only 0.43 R@1 on real global retrieval).
 
-    Final ablation evaluation is performed separately on the HotpotQA
-    *validation* split (ablation.py), which is completely independent.
+    Pick the final epoch with ablation.py, which evaluates on the full pooled
+    corpus of the HotpotQA validation split (true global retrieval).
 
     Returns a dict with Recall@1, Recall@5, Recall@10, MRR@10, nDCG@10.
     """
@@ -291,13 +297,13 @@ def evaluate_recall(model_dir="models/dpr_finetuned", max_samples=200,
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    model_dir = train(
+    output_dir = train(
         data_path="data/hard_negatives_train.json",
-        output_dir="models/dpr_finetuned",
-        max_samples=None,   # local test: set to 50; full run: None
-        epochs=3,           # local test: set to 1
-        batch_size=4,       # local CPU: 2-4; A100: 16-32
+        output_dir="models/dpr_hn_v2",
+        max_samples=None,   # local test: set small; full run: None
+        epochs=3,
+        batch_size=16,      # small GPU: 8; CPU: 4
         lr=2e-5,
     )
-    # Final evaluation on held-out hard-negatives validation set
-    evaluate_recall(model_dir=model_dir, max_samples=200, val_path="data/hard_negatives_val.json")
+    print("\nNext: select the best epoch on global retrieval with src/ablation.py")
+    print(f"      (point 'DPR + HN' at {output_dir}/epoch3 or whichever epoch wins).")

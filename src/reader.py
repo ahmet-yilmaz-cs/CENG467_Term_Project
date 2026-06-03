@@ -7,11 +7,12 @@ import numpy as np
 import torch
 from tqdm import tqdm
 from transformers import (
+    AutoModelForSeq2SeqLM,
+    AutoTokenizer,
     DPRContextEncoder,
     DPRContextEncoderTokenizerFast,
     DPRQuestionEncoder,
     DPRQuestionEncoderTokenizerFast,
-    pipeline,
 )
 
 from load_dataset import load_hotpotqa
@@ -26,8 +27,7 @@ QA_MODEL = "google/flan-t5-xl"
 VANILLA_Q_MODEL = "facebook/dpr-question_encoder-single-nq-base"
 VANILLA_C_MODEL = "facebook/dpr-ctx_encoder-single-nq-base"
 
-device    = "cuda" if torch.cuda.is_available() else "cpu"
-device_id = 0 if torch.cuda.is_available() else -1   # pipeline() uses -1 for CPU
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 # ---------------------------------------------------------------------------
@@ -73,15 +73,17 @@ def collect_passages(dataset):
 
 def load_dpr_encoders(model_dir=None):
     """
-    model_dir: path to fine-tuned model (e.g. 'models/dpr_finetuned/best_model').
-               If None or directory does not exist, falls back to vanilla DPR.
+    model_dir: path to fine-tuned model (e.g. 'models/dpr_hn_v2/epoch3').
+               If None, uses vanilla DPR. If a path is given it MUST exist
+               (fails loudly instead of silently falling back to vanilla).
     """
-    if model_dir and os.path.isdir(f"{model_dir}/question_encoder"):
-        print(f"Loading fine-tuned DPR from {model_dir}/")
+    if model_dir:
         q_enc_path = f"{model_dir}/question_encoder"
         c_enc_path = f"{model_dir}/context_encoder"
+        assert os.path.isdir(q_enc_path), f"Fine-tuned model not found: {q_enc_path}"
+        print(f"Loading fine-tuned DPR from {model_dir}/")
     else:
-        print("Fine-tuned model not found, using vanilla DPR.")
+        print("Using vanilla DPR.")
         q_enc_path = VANILLA_Q_MODEL
         c_enc_path = VANILLA_C_MODEL
 
@@ -151,10 +153,11 @@ def retrieve(question, faiss_index, passages, q_tokenizer, q_encoder, top_k=3):
 # Reader: extractive QA over retrieved passages
 # ---------------------------------------------------------------------------
 
-def read(question, top_passages, qa_pipeline):
+def read(question, top_passages, reader_model, reader_tokenizer):
     """
     Run Flan-T5-xl on the concatenated top passages and return the generated answer.
-    All retrieved passages are joined into a single context for the generative reader.
+    Uses model.generate() directly — the "text2text-generation" pipeline task
+    was removed in recent transformers versions.
     """
     context = " ".join([p["title"] + " " + p["text"] for p in top_passages])
     # Truncate context to avoid exceeding model input limits
@@ -165,8 +168,12 @@ def read(question, top_passages, qa_pipeline):
         f"Question: {question}\n"
         f"Answer:"
     )
-    result = qa_pipeline(prompt, max_new_tokens=50, do_sample=False)
-    answer = result[0]["generated_text"].strip()
+    inputs = reader_tokenizer(
+        prompt, return_tensors="pt", truncation=True, max_length=512,
+    ).to(device)
+    with torch.no_grad():
+        output = reader_model.generate(**inputs, max_new_tokens=50, do_sample=False)
+    answer = reader_tokenizer.decode(output[0], skip_special_tokens=True).strip()
     return answer, 1.0  # score placeholder for API compatibility
 
 
@@ -175,7 +182,7 @@ def read(question, top_passages, qa_pipeline):
 # ---------------------------------------------------------------------------
 
 def run_reader_pipeline(
-    model_dir="models/dpr_finetuned/best_model",
+    model_dir="models/dpr_hn_v2/epoch3",
     max_samples=500,
     top_k=3,
     output_path="results/reader_results.json",
@@ -186,9 +193,10 @@ def run_reader_pipeline(
     # Load DPR encoders
     q_tokenizer, q_encoder, c_tokenizer, c_encoder = load_dpr_encoders(model_dir)
 
-    # Load QA reader
+    # Load QA reader (model.generate directly; no pipeline)
     print(f"Loading QA reader ({QA_MODEL})...")
-    qa = pipeline("text-generation", model=QA_MODEL, device=device_id)
+    reader_tokenizer = AutoTokenizer.from_pretrained(QA_MODEL)
+    reader_model     = AutoModelForSeq2SeqLM.from_pretrained(QA_MODEL).to(device).eval()
     print("  Reader loaded.")
 
     dataset = load_hotpotqa(split="validation", max_samples=max_samples)
@@ -219,7 +227,7 @@ def run_reader_pipeline(
         recall_at_k     += hit
 
         # Step 2: extract answer from retrieved passages
-        predicted, score = read(question, top_passages, qa)
+        predicted, score = read(question, top_passages, reader_model, reader_tokenizer)
 
         f1 = token_f1(predicted, answer)
         em = exact_match(predicted, answer)
@@ -265,7 +273,7 @@ def run_reader_pipeline(
 
 if __name__ == "__main__":
     run_reader_pipeline(
-        model_dir="models/dpr_finetuned/best_model",
+        model_dir="models/dpr_hn_v2/epoch3",
         max_samples=500,
         top_k=3,
         output_path="results/reader_results.json",
