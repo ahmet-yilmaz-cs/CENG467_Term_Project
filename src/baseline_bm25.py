@@ -1,4 +1,5 @@
 import json
+import os
 import string
 from tqdm import tqdm
 from rank_bm25 import BM25Okapi
@@ -108,6 +109,7 @@ def run_bm25_baseline(max_samples=500, top_k=5):
     for k, v in metrics.items():
         print(f"  {k}: {v}")
 
+    os.makedirs("results", exist_ok=True)
     with open("results/bm25_results.json", "w") as f:
         json.dump({"metrics": metrics, "predictions": results[:50]}, f, indent=2)
 

@@ -1,17 +1,19 @@
 from datasets import load_dataset
 
 
-def load_hotpotqa(split="validation", max_samples=None):
+def load_hotpotqa(split="validation", max_samples=None, start=0):
     """
     Loads HotpotQA in distractor setting.
-    split: "train" (90k) or "validation" (7.4k)
-    max_samples: subset size for quick testing
+    split     : "train" (90k) or "validation" (7.4k)
+    max_samples: number of examples to load
+    start     : first index to load (for held-out slices)
     """
-    print(f"Loading HotpotQA ({split})...")
-    dataset = load_dataset("hotpot_qa", "distractor", split=split)
+    print(f"Loading HotpotQA ({split}, start={start})...")
+    dataset = load_dataset("hotpotqa/hotpot_qa", "distractor", split=split)
 
-    if max_samples:
-        dataset = dataset.select(range(max_samples))
+    if start > 0 or max_samples:
+        end = (start + max_samples) if max_samples else len(dataset)
+        dataset = dataset.select(range(start, min(end, len(dataset))))
 
     print(f"  Loaded {len(dataset)} examples")
     print(f"  Columns: {dataset.column_names}")
