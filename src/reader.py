@@ -150,7 +150,7 @@ def retrieve(question, faiss_index, passages, q_tokenizer, q_encoder, top_k=3):
 
 
 # ---------------------------------------------------------------------------
-# Reader: extractive QA over retrieved passages
+# Reader: generative QA over retrieved passages
 # ---------------------------------------------------------------------------
 
 def read(question, top_passages, reader_model, reader_tokenizer):

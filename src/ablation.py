@@ -289,7 +289,7 @@ def run_ablation(
     print(f"  → {metrics}")
 
     # ------------------------------------------------------------------
-    # 2–4. DPR variants
+    # DPR variants (vanilla + fine-tuned)
     # ------------------------------------------------------------------
     for idx, (name, model_dir) in enumerate(dpr_model_dirs.items(), start=2):
         print(f"\n[{idx}/{1+len(dpr_model_dirs)}] {name}")
