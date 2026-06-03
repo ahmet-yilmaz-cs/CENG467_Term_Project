@@ -103,7 +103,7 @@ def train(
         lr=lr,
     )
 
-    data = load_hard_negatives(data_path, max_samples=max_samples)
+    data     = load_hard_negatives(data_path, max_samples=max_samples)
 
     # LR scheduler with linear warmup (10% of total steps)
     total_steps    = (len(data) // batch_size) * epochs
