@@ -45,12 +45,14 @@ negatives, indexing passages in a FAISS vector database, and integrating
 Flan-T5-xl as a generative reader. Hard negative mining improves Recall@1
 by 13.0 percentage points over vanilla DPR (0.844 vs.\ 0.714) and by 14.0
 points over BM25 (0.704), with consistent gains in MRR@10 (0.895 vs.\ 0.793)
-and nDCG@10 (0.811 vs.\ 0.688). End-to-end evaluation with Flan-T5-xl achieves
+and nDCG@10 (0.811 vs.\ 0.688 for vanilla DPR). End-to-end evaluation with Flan-T5-xl achieves
 F1\,=\,0.539 and Exact Match\,=\,0.428. An ablation study over three retrieval
-configurations shows that the pretrained (Natural Questions) DPR only matches
-the lexical BM25 baseline and that the improvement is driven entirely by hard
-negative fine-tuning; qualitative error analysis identifies yes/no questions
-and multi-hop reasoning as the dominant remaining failure modes.
+configurations shows that the pretrained (Natural Questions) DPR does not
+consistently outperform the lexical BM25 baseline --- it leads marginally
+at R@1 but falls behind at R@3, R@5, and R@10 --- and that the decisive
+improvement is driven entirely by hard negative fine-tuning; qualitative
+error analysis identifies yes/no questions and multi-hop reasoning as the
+dominant remaining failure modes.
 \keywords{Retrieval-Augmented Generation \and Dense Passage Retrieval \and
 Hard Negative Mining \and Multi-Hop Question Answering \and HotpotQA}
 \end{abstract}
@@ -124,8 +126,10 @@ task-specific reader fine-tuning.
 \section{System Overview}
 
 Figure~\ref{fig:pipeline} illustrates the end-to-end pipeline. Hard
-negative mining and DPR fine-tuning occur offline; at inference time,
-only the question encoder, FAISS index, and Flan-T5-xl reader are active.
+negative mining and DPR fine-tuning occur offline; the context encoder is
+also used offline to encode all corpus passages and build the FAISS index.
+At inference time, only the question encoder, the pre-built FAISS index,
+and the Flan-T5-xl reader are active.
 
 \begin{figure}[t]
 \centering
@@ -160,14 +164,14 @@ only the question encoder, FAISS index, and Flan-T5-xl reader are active.
 \draw[arr] (rd)   -- (ans);
 
 % Labels
-\node[lbl, above=1mm of hn,  xshift=18mm] {Offline (training)};
+\node[lbl, above=1mm of hn,  xshift=18mm] {Offline (training \& indexing)};
 \node[lbl, above=1mm of q,   xshift=18mm] {Online (inference)};
 
 \end{tikzpicture}
 \caption{End-to-end RAG pipeline. The offline stage mines hard negatives
-with BM25 and fine-tunes DPR to build a FAISS index. At inference,
-the question encoder retrieves top-$k$ passages which Flan-T5-xl reads
-to generate the final answer.}
+with BM25, fine-tunes DPR, and uses the context encoder to build a FAISS
+index over the corpus. At inference, the question encoder retrieves top-$k$
+passages which Flan-T5-xl reads to generate the final answer.}
 \label{fig:pipeline}
 \end{figure}
 
@@ -183,34 +187,43 @@ $\mathcal{H}_i = \{ p \in \mathcal{P} \setminus \mathcal{G}_i \mid
 \mathrm{rank}_\mathrm{BM25}(p, q_i) \leq K \}$,
 with $K = 5$. These hard negatives are lexically similar to the question,
 making them genuinely difficult to distinguish from true supporting passages.
-We mine 30{,}000 examples from the HotpotQA train split, producing up to 5 hard
-negatives each, and reserve 20\% as a held-out diagnostic set.
+In practice, each question yields \emph{at most} 5 hard negatives: examples
+for which no gold passage can be identified are discarded, and the available
+distractor pool may be smaller than $K$ for some questions. We mine 30{,}000
+examples from the HotpotQA train split; after discarding unanswerable
+examples and reserving 20\% as a held-out diagnostic set, approximately
+24{,}000 examples remain for training.
 
 \subsection{DPR Fine-Tuning}
 
 We fine-tune the pretrained DPR question and context encoders
 (\texttt{facebook/dpr-*-single-nq-base}) with contrastive loss. For a
 mini-batch of size $B$, each question's positive passage is placed on the
-diagonal; all remaining in-batch positives together with all hard negatives
-serve as negatives:
+diagonal of the similarity matrix; all remaining in-batch positives
+\emph{together with all hard negatives} serve as negatives. Concretely,
+the passage matrix $\mathbf{P}$ has $B + B \cdot n_\mathrm{HN}$ rows, where
+$n_\mathrm{HN}$ is the number of hard negatives per question in the current
+epoch:
 \begin{equation}
     \mathcal{L} = -\frac{1}{B} \sum_{i=1}^{B}
     \log \frac{\exp\!\left(f(q_i)^\top f(p^+_i)\right)}
-         {\displaystyle\sum_{j} \exp\!\left(f(q_i)^\top f(p_j)\right)}
+         {\displaystyle\sum_{j=1}^{B + B \cdot n_\mathrm{HN}}
+          \exp\!\left(f(q_i)^\top f(p_j)\right)}
 \end{equation}
-where $f(\cdot)$ is the encoder's pooler output (768 dimensions). We use
-AdamW with $lr = 2\times10^{-5}$, gradient clipping (max\_norm\,=\,1.0),
-and a linear LR scheduler with 10\% warmup steps to stabilise contrastive
-training. We apply a \textbf{curriculum strategy}: epoch~1 uses 1 hard
-negative per question, epoch~2 uses 3, and epoch~3 uses the full 5. This
-prevents early gradient instability caused by excessively difficult
-negatives at the start of training. We checkpoint every epoch and select the
-final model by \textbf{global-corpus retrieval} on the ablation set, not by
-the per-question mini-pool used during training: with only the $\sim$7
-in-batch candidates per question, the mini-pool metric saturates and
-correlates poorly with open-corpus retrieval. The final model
-(\textit{DPR + HN}) is trained on the full $\sim$24{,}000-example training
-split with batch size 16.
+where $f(\cdot)$ is the encoder's pooler output (768 dimensions) and the
+denominator ranges over all $B$ positives plus $B \cdot n_\mathrm{HN}$
+hard negatives concatenated in the batch. We use AdamW with
+$lr = 2\times10^{-5}$, gradient clipping (max\_norm\,=\,1.0), and a linear
+LR scheduler with 10\% warmup steps to stabilise contrastive training. We
+apply a \textbf{curriculum strategy}: epoch~1 uses 1 hard negative per
+question, epoch~2 uses 3, and epoch~3 uses the full 5. This prevents early
+gradient instability caused by excessively difficult negatives at the start
+of training. We checkpoint every epoch and select the final model by
+\textbf{global-corpus retrieval} on the ablation set, not by the per-question
+mini-pool used during training: with only the $\sim$7 in-batch candidates per
+question, the mini-pool metric saturates and correlates poorly with
+open-corpus retrieval. The final model (\textit{DPR + HN}) is trained on
+the full $\sim$24{,}000-example training split with batch size 16.
 
 \subsection{Training Configuration}
 
@@ -245,8 +258,9 @@ Hardware                & NVIDIA A100 (40 GB) \\
 
 \subsection{FAISS Vector Index}
 
-All unique passages from the 500 validation examples (4{,}937 passages) are
-encoded with the context encoder and indexed using FAISS
+All unique passages from the 500 validation examples (approximately 4{,}900
+passages after title-based deduplication) are encoded offline with the
+context encoder and indexed using FAISS
 \texttt{IndexFlatIP}~\cite{johnson2019faiss}, which performs exact
 inner-product search. At inference time, the question encoder produces a
 query vector and FAISS returns the top-$k$ nearest passages by dot-product
@@ -281,8 +295,10 @@ quality, treating the supporting-fact passages as relevant), \textbf{Token F1}
 is available at
 \url{https://github.com/ahmet-yilmaz-cs/CENG467_Term_Project}.
 
-We compare three configurations under identical conditions (same 4{,}937-passage
-global FAISS corpus, same Flan-T5-xl reader):
+We compare three configurations under identical conditions (same 500 validation
+examples, same global passage corpus of approximately 4{,}900 passages, same
+Flan-T5-xl reader). BM25 searches this corpus with \texttt{rank\_bm25}; both
+DPR variants build a FAISS index over the same passages:
 \textbf{(1) BM25} --- lexical retrieval with \texttt{rank\_bm25};
 \textbf{(2) DPR (vanilla)} --- pretrained DPR without fine-tuning;
 \textbf{(3) DPR + HN} --- DPR fine-tuned on the hard-negative training split.
@@ -298,7 +314,7 @@ end-to-end QA metrics across all three configurations.
 \begin{table}[t]
 \centering
 \caption{Retrieval quality on 500 HotpotQA validation examples over the same
-global FAISS corpus (4{,}937 passages). Recall@k is the fraction of questions
+global FAISS corpus. Recall@k is the fraction of questions
 with at least one gold passage in the top $k$; MRR@10 and nDCG@10 measure
 ranking quality.}
 \label{tab:ablation}
@@ -335,7 +351,7 @@ DPR + HN               & \textbf{0.539} & \textbf{0.428} \\
 \noindent\textbf{Effect of hard negative mining.}
 DPR + HN improves Recall@1 by 13.0 percentage points over vanilla DPR
 (0.844 vs.\ 0.714) and by 14.0 points over BM25 (0.704). The gains hold at
-every cutoff (R@3 +8.2, R@5 +7.4 over vanilla) and, crucially, at the top of
+every cutoff (R@3 +8.2 pp, R@5 +7.4 pp over vanilla) and, crucially, at the top of
 the ranking: MRR@10 rises from 0.793 to 0.895 and nDCG@10 from 0.688 to
 0.811. Because the reader consumes only the top-3 passages, these
 top-of-ranking gains are exactly what propagate to answer quality. The results
@@ -344,13 +360,14 @@ forcing the model to distinguish semantically similar but factually incorrect
 passages.
 
 \noindent\textbf{BM25 vs.\ vanilla DPR.}
-The pretrained DPR (Natural Questions) does \emph{not} outperform the lexical
-BM25 baseline: BM25 is higher at R@3, R@5, and R@10 (e.g.\ 0.980 vs.\ 0.932 at
-R@10) and essentially tied at MRR@10 and nDCG@10, while DPR leads only
-marginally at R@1 (0.714 vs.\ 0.704). This is expected --- vanilla DPR has not
-been adapted to HotpotQA's multi-hop bridging structure --- and shows that
-out-of-the-box dense retrieval is not a free improvement over lexical search.
-The benefit appears only after hard negative fine-tuning, which surpasses both
+The pretrained DPR (Natural Questions) does not consistently outperform the
+lexical BM25 baseline: it leads marginally at R@1 (0.714 vs.\ 0.704, a
+difference of one percentage point), but falls behind at R@3, R@5, and R@10
+(e.g.\ 0.932 vs.\ 0.980 at R@10) and is essentially tied at MRR@10 and
+nDCG@10. This pattern is expected --- vanilla DPR has not been adapted to
+HotpotQA's multi-hop bridging structure --- and shows that out-of-the-box
+dense retrieval does not reliably improve over lexical search. The decisive
+advantage appears only after hard negative fine-tuning, which surpasses both
 baselines decisively across all metrics.
 
 \subsection{End-to-End QA Performance}
@@ -388,8 +405,8 @@ the gold passage by leveraging semantic context around the consultant
 relation, demonstrating the value of hard negative training.
 
 \paragraph{Reader failures on yes/no questions.}
-HotpotQA contains approximately 20\% yes/no questions. Flan-T5-xl
-occasionally generates explanatory text rather than a binary answer:
+HotpotQA contains approximately 20\% yes/no questions~\cite{yang2018hotpotqa}.
+Flan-T5-xl occasionally generates explanatory text rather than a binary answer:
 \begin{quote}
 \small
 \textit{Q: Are the Laleli Mosque and Esma Sultan Mansion in the same
@@ -437,8 +454,8 @@ positional encoding) would directly address this failure mode.
 \section{Discussion}
 
 \paragraph{Hard negative mining is the decisive factor.}
-The jump from vanilla DPR (R@1 0.714, on par with BM25) to DPR + HN
-(R@1 0.844) validates our core hypothesis: the gain comes from
+The jump from vanilla DPR (R@1 0.714, roughly on par with BM25 at 0.704) to
+DPR + HN (R@1 0.844) validates our core hypothesis: the gain comes from
 domain-specific hard negatives, not from dense retrieval per se. Training on
 the full $\sim$24{,}000-example split with gradient clipping, a warmup--decay
 schedule, and curriculum hard negatives is stable and improves monotonically
@@ -448,7 +465,7 @@ across epochs, with no sign of degradation at scale.
 During training we score checkpoints on the per-question mini-pool
 ($\sim$7 candidates: the positives plus their hard negatives), but this metric
 saturates and does not track open-corpus quality. Selecting the final epoch on
-the global 4{,}937-passage corpus instead is what reliably identifies the best
+the global corpus instead is what reliably identifies the best
 model; relying on the mini-pool metric can select a checkpoint that looks
 strong locally yet retrieves poorly at corpus scale. This also explains the
 gap between a near-saturated training-time Recall@5 and the global-corpus
@@ -491,11 +508,12 @@ indexing, and Flan-T5-xl generative reading. Hard negative mining improves
 Recall@1 by 13.0 points over vanilla DPR and 14.0 points over BM25, with
 matching gains in MRR@10 and nDCG@10, and these retrieval gains carry through
 to the end-to-end QA metrics (F1\,=\,0.539, EM\,=\,0.428). Our ablation shows
-that out-of-the-box dense retrieval merely matches BM25 on this multi-hop
-benchmark --- the improvement is attributable entirely to hard negative
-fine-tuning --- and that selecting checkpoints on the global corpus rather
-than a small per-question pool is essential for a faithful comparison. Future
-work should scale hard negative mining to the full 90k training split,
+that out-of-the-box dense retrieval does not consistently outperform BM25 on
+this multi-hop benchmark --- leading only marginally at R@1 while falling
+behind at higher cutoffs --- and that the improvement is attributable entirely
+to hard negative fine-tuning. Selecting checkpoints on the global corpus
+rather than a small per-question pool is essential for a faithful comparison.
+Future work should scale hard negative mining to the full 90k training split,
 fine-tune the reader, and evaluate over a full open-domain Wikipedia corpus
 for an even more realistic retrieval scenario.
 
@@ -509,7 +527,7 @@ In: Proceedings of EMNLP, pp. 6769--6781 (2020)
 
 \bibitem{xiong2021ance}
 Xiong, L., Xiong, C., Li, Y., Tang, K.F., Liu, J., Bennett, P., Ahmed, J.,
-Overwijk, A.: Approximate nearest neighbor negative contrastive estimation
+Overwijk, A.: Approximate nearest neighbor negative contrastive learning
 for dense text retrieval. In: Proceedings of ICLR (2021)
 
 \bibitem{qu2021rocketqa}
@@ -537,7 +555,7 @@ and beyond. Foundations and Trends in Information Retrieval 3(4),
 
 \bibitem{johnson2019faiss}
 Johnson, J., Douze, M., J{\'e}gou, H.: Billion-scale similarity search
-with GPUs. IEEE Transactions on Big Data 7(3), 535--547 (2019)
+with GPUs. IEEE Transactions on Big Data 7(3), 535--547 (2021)
 
 \bibitem{chung2022flant5}
 Chung, H.W., et al.: Scaling instruction-finetuned language models.
