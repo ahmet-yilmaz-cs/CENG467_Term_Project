@@ -9,7 +9,7 @@ def load_hotpotqa(split="validation", max_samples=None, start=0):
     start     : first index to load (for held-out slices)
     """
     print(f"Loading HotpotQA ({split}, start={start})...")
-    dataset = load_dataset("hotpot_qa", "distractor", split=split)
+    dataset = load_dataset("hotpotqa/hotpot_qa", "distractor", split=split)
 
     if start > 0 or max_samples:
         end = (start + max_samples) if max_samples else len(dataset)
