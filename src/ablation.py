@@ -4,7 +4,7 @@ Ablation study — unified evaluation on a single FAISS corpus.
 Compares all retrieval configurations on identical conditions:
   - Same 500 validation examples
   - Same global FAISS index (all unique passages from those 500 examples)
-  - Recall@1, Recall@3, Recall@5 for retrieval quality
+  - Recall@1/3/5/10, MRR@10, nDCG@10 for retrieval quality
   - F1 and EM after reader integration (top-3 passages)
 
 Configurations tested:
@@ -179,16 +179,26 @@ def read(question, top_passages, reader_model, reader_tokenizer):
 # Evaluate one configuration
 # ---------------------------------------------------------------------------
 
-def evaluate_config(name, dataset, all_passages, retriever_fn, reader_model, reader_tokenizer, top_k_list):
+def evaluate_config(name, dataset, all_passages, retriever_fn, reader_model, reader_tokenizer, top_k_list, rank_k=10):
     """
-    retriever_fn(question, top_k) -> list of passage dicts
-    Returns a metrics dict.
+    retriever_fn(question, top_k) -> list of passage dicts.
+
+    Returns a metrics dict: Recall@k (for k in top_k_list), plus ranking
+    metrics over the top rank_k (Recall@rank_k, MRR@rank_k, nDCG@rank_k),
+    plus reader F1 / EM on the top-3 passages.
+
+    HotpotQA is multi-hop: there are usually 2 gold ("supporting_facts")
+    passages. Recall@k = at least one gold in the top k. MRR uses the first
+    gold's rank. nDCG treats all gold passages as relevant.
     """
-    recalls   = {k: 0 for k in top_k_list}
-    f1_total  = 0.0
-    em_total  = 0.0
-    max_k     = max(top_k_list)
-    reader_k  = 3
+    recalls      = {k: 0 for k in top_k_list}
+    recall_rank  = 0
+    mrr_total    = 0.0
+    ndcg_total   = 0.0
+    f1_total     = 0.0
+    em_total     = 0.0
+    max_k        = max(max(top_k_list), rank_k)
+    reader_k     = 3
 
     for ex in tqdm(dataset, desc=f"  {name}", leave=False):
         question    = ex["question"]
@@ -196,13 +206,28 @@ def evaluate_config(name, dataset, all_passages, retriever_fn, reader_model, rea
         gold_titles = set(ex["supporting_facts"]["title"])
 
         # Retrieve max_k passages once
-        top_passages = retriever_fn(question, max_k)
+        top_passages  = retriever_fn(question, max_k)
+        ranked_titles = [p["title"] for p in top_passages]
 
-        # Recall@k for each k
+        # Recall@k (at least one gold in top k)
         for k in top_k_list:
-            retrieved_k = {p["title"] for p in top_passages[:k]}
-            if gold_titles & retrieved_k:
+            if gold_titles & set(ranked_titles[:k]):
                 recalls[k] += 1
+        if gold_titles & set(ranked_titles[:rank_k]):
+            recall_rank += 1
+
+        # MRR@rank_k (reciprocal rank of the first gold passage)
+        for rank, title in enumerate(ranked_titles[:rank_k], start=1):
+            if title in gold_titles:
+                mrr_total += 1.0 / rank
+                break
+
+        # nDCG@rank_k (all gold passages relevant)
+        dcg  = sum(1.0 / np.log2(i + 2)
+                   for i, t in enumerate(ranked_titles[:rank_k]) if t in gold_titles)
+        idcg = sum(1.0 / np.log2(i + 2)
+                   for i in range(min(len(gold_titles), rank_k)))
+        ndcg_total += dcg / idcg if idcg > 0 else 0.0
 
         # Reader on top reader_k passages
         predicted = read(question, top_passages[:reader_k], reader_model, reader_tokenizer)
@@ -213,6 +238,9 @@ def evaluate_config(name, dataset, all_passages, retriever_fn, reader_model, rea
     metrics = {"config": name, "n": n}
     for k in top_k_list:
         metrics[f"Recall@{k}"] = round(recalls[k] / n, 4)
+    metrics[f"Recall@{rank_k}"] = round(recall_rank / n, 4)
+    metrics[f"MRR@{rank_k}"]    = round(mrr_total / n, 4)
+    metrics[f"nDCG@{rank_k}"]   = round(ndcg_total / n, 4)
     metrics["F1"]          = round(f1_total / n, 4)
     metrics["Exact Match"] = round(em_total / n, 4)
     return metrics
@@ -278,14 +306,16 @@ def run_ablation(
     # Print summary table
     # ------------------------------------------------------------------
     print("\n=== Ablation Results ===")
-    header = f"{'Config':<20} " + " ".join(f"R@{k:<5}" for k in top_k_list) + "  F1      EM"
+    rk    = 10
+    cols  = [f"Recall@{k}" for k in top_k_list] + [f"Recall@{rk}", f"MRR@{rk}", f"nDCG@{rk}", "F1", "Exact Match"]
+    short = {**{f"Recall@{k}": f"R@{k}" for k in top_k_list},
+             f"Recall@{rk}": f"R@{rk}", f"MRR@{rk}": f"MRR@{rk}",
+             f"nDCG@{rk}": f"nDCG@{rk}", "F1": "F1", "Exact Match": "EM"}
+    header = f"{'Config':<18}" + "".join(f"{short[c]:>9}" for c in cols)
     print(header)
     print("-" * len(header))
     for m in all_metrics:
-        row = f"{m['config']:<20} "
-        row += " ".join(f"{m[f'Recall@{k}']:<7.4f}" for k in top_k_list)
-        row += f"  {m['F1']:<7.4f}  {m['Exact Match']:.4f}"
-        print(row)
+        print(f"{m['config']:<18}" + "".join(f"{m[c]:>9.4f}" for c in cols))
 
     with open(output_path, "w") as f:
         json.dump(all_metrics, f, indent=2)
