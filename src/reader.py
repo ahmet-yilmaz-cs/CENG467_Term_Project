@@ -188,7 +188,7 @@ def run_reader_pipeline(
 
     # Load QA reader
     print(f"Loading QA reader ({QA_MODEL})...")
-    qa = pipeline("text2text-generation", model=QA_MODEL, device=device_id)
+    qa = pipeline("text-generation", model=QA_MODEL, device=device_id)
     print("  Reader loaded.")
 
     dataset = load_hotpotqa(split="validation", max_samples=max_samples)

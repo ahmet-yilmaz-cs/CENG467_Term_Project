@@ -236,7 +236,7 @@ def run_ablation(
 
     # Load reader once — shared across all configs
     print(f"Loading QA reader ({QA_MODEL})...")
-    qa_pipe = pipeline("text2text-generation", model=QA_MODEL, device=device_id)
+    qa_pipe = pipeline("text-generation", model=QA_MODEL, device=device_id)
 
     all_metrics = []
 
