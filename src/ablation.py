@@ -168,7 +168,7 @@ def read(question, top_passages, reader_model, reader_tokenizer):
         f"Answer:"
     )
     inputs = reader_tokenizer(
-        prompt, return_tensors="pt", truncation=True, max_length=512,
+        prompt, return_tensors="pt", truncation=True, max_length=1024,
     ).to(device)
     with torch.no_grad():
         output = reader_model.generate(**inputs, max_new_tokens=50, do_sample=False)

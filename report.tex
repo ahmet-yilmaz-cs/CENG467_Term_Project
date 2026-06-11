@@ -46,13 +46,14 @@ Flan-T5-xl as a generative reader. Hard negative mining improves Recall@1
 by 13.0 percentage points over vanilla DPR (0.844 vs.\ 0.714) and by 14.0
 points over BM25 (0.704), with consistent gains in MRR@10 (0.895 vs.\ 0.793)
 and nDCG@10 (0.811 vs.\ 0.688 for vanilla DPR). End-to-end evaluation with Flan-T5-xl achieves
-F1\,=\,0.539 and Exact Match\,=\,0.428. An ablation study over three retrieval
+F1\,=\,0.583 and Exact Match\,=\,0.466. An ablation study over three retrieval
 configurations shows that the pretrained (Natural Questions) DPR does not
 consistently outperform the lexical BM25 baseline --- it leads marginally
 at R@1 but falls behind at R@3, R@5, and R@10 --- and that the decisive
-improvement is driven entirely by hard negative fine-tuning; qualitative
-error analysis identifies yes/no questions and multi-hop reasoning as the
-dominant remaining failure modes.
+improvement is driven entirely by hard negative fine-tuning, and is
+statistically significant ($p < 0.001$, paired bootstrap). A per-category
+breakdown identifies bridge (multi-hop) questions as the dominant remaining
+failure mode, while yes/no questions are handled well.
 \keywords{Retrieval-Augmented Generation \and Dense Passage Retrieval \and
 Hard Negative Mining \and Multi-Hop Question Answering \and HotpotQA}
 \end{abstract}
@@ -341,9 +342,9 @@ answer quality.}
 \toprule
 \textbf{Configuration} & \textbf{F1} & \textbf{EM} \\
 \midrule
-BM25                   & 0.460 & 0.352 \\
-DPR (vanilla)          & 0.442 & 0.346 \\
-DPR + HN               & \textbf{0.539} & \textbf{0.428} \\
+BM25                   & 0.496 & 0.388 \\
+DPR (vanilla)          & 0.485 & 0.384 \\
+DPR + HN               & \textbf{0.583} & \textbf{0.466} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -372,14 +373,90 @@ baselines decisively across all metrics.
 
 \subsection{End-to-End QA Performance}
 
-The full pipeline (DPR + HN + FAISS + Flan-T5-xl) achieves F1\,=\,0.539 and
-EM\,=\,0.428 (Table~\ref{tab:qa}). The same Flan-T5-xl reader on the vanilla
-DPR and BM25 retrievers reaches only F1\,=\,0.442 and F1\,=\,0.460
-respectively, so the retrieval gains from hard negative mining translate
-directly into a +0.08--0.10 F1 and +0.08 EM improvement downstream. The reader
-runs zero-shot (no task-specific fine-tuning); its absolute scores are bounded
-by this and by multi-hop questions that require synthesising both supporting
-passages, analysed next.
+The full pipeline (DPR + HN + FAISS + Flan-T5-xl) achieves F1\,=\,0.583 and
+EM\,=\,0.466 (Table~\ref{tab:qa}). The same reader on the vanilla DPR and BM25
+retrievers reaches only F1\,=\,0.485 and F1\,=\,0.496 respectively, so the
+retrieval gains from hard negative mining translate directly into a $\sim$0.10
+F1 and 0.08 EM improvement downstream.
+
+\noindent\textbf{Reader input budget.}
+The single largest reader-side lever was the tokeniser input limit. At 512
+tokens, the instruction, the 2{,}000-character context, and the question
+together exceed the budget and the question is truncated; raising the limit to
+1{,}024 tokens recovers roughly 4 F1 points uniformly across all configurations
+(DPR + HN: 0.539\,$\to$\,0.583 F1). This was a larger gain than any prompt or
+model change we tried.
+
+\noindent\textbf{Reader comparison.}
+Table~\ref{tab:readers} compares three readers on the fixed DPR + HN retriever,
+each in its best configuration. Flan-T5-xl (3B, encoder--decoder) slightly
+outperforms the larger Qwen2.5-7B-Instruct and the smaller
+Phi-4-mini-Instruct. Few-shot prompting with answer post-processing helps the
+decoder-only instruction model (Qwen: +0.025 F1) but is neutral for the others,
+and the long multi-part instruction actually \emph{harms} Flan-T5-xl ---
+prompt sensitivity is model-specific. The reader runs zero-shot; its absolute
+score is further bounded by multi-hop questions that require synthesising both
+supporting passages, analysed next.
+
+\begin{table}[t]
+\centering
+\caption{Reader comparison on the fixed DPR + HN retriever (top-3 passages,
+500 validation questions), each reader in its best configuration. The 7B and
+3.8B decoder-only models are 4-bit quantised.}
+\label{tab:readers}
+\begin{tabular}{lrr}
+\toprule
+\textbf{Reader} & \textbf{F1} & \textbf{EM} \\
+\midrule
+Flan-T5-xl (3B)            & \textbf{0.583} & \textbf{0.466} \\
+Qwen2.5-7B-Instruct        & 0.574 & 0.452 \\
+Phi-4-mini-Instruct (3.8B) & 0.520 & 0.390 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Statistical Significance and Breakdown}
+
+\noindent\textbf{Significance.}
+On the 500 validation questions, DPR + HN improves F1 by $+0.097$ (95\%
+bootstrap CI $[+0.061, +0.134]$) and Recall@1 by $+0.130$ ($[+0.086, +0.172]$)
+over vanilla DPR; both gains are significant at $p < 0.001$ (paired bootstrap,
+5{,}000 resamples). The headline metrics with 95\% CIs are DPR + HN
+R@1 $= 0.844\,[0.812, 0.876]$ and F1 $= 0.582\,[0.542, 0.621]$, confirming the
+improvements are not artefacts of the sample size.
+
+\noindent\textbf{Strict (both-passage) recall.}
+HotpotQA answers depend on \emph{two} supporting passages. Under the stricter
+criterion that \emph{both} gold passages appear in the top 5, recall drops
+sharply --- DPR + HN $0.962 \to 0.616$, vanilla $0.888 \to 0.462$, BM25
+$0.904 \to 0.406$ --- revealing the true difficulty of multi-hop retrieval that
+the standard ``at least one gold'' criterion masks. DPR + HN retains the
+largest margin (+0.15 over vanilla).
+
+\noindent\textbf{Per-category breakdown.}
+Table~\ref{tab:breakdown} breaks DPR + HN end-to-end performance down by
+question type. Comparison questions (F1 0.781) are handled far better than
+bridge questions (F1 0.535), which require following a bridge entity across two
+passages and are the dominant failure mode. Yes/no questions, though few
+(33/500), are answered nearly perfectly (EM 0.909) --- contrary to the common
+assumption that generative readers mishandle them.
+
+\begin{table}[t]
+\centering
+\caption{DPR + HN end-to-end performance by question category (500 validation
+questions; the dev split is entirely ``hard'' level).}
+\label{tab:breakdown}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Category} & \textbf{n} & \textbf{F1} & \textbf{EM} & \textbf{R@1} \\
+\midrule
+Bridge      & 404 & 0.535 & 0.416 & 0.817 \\
+Comparison  &  96 & 0.781 & 0.677 & 0.958 \\
+Yes/no      &  33 & 0.909 & 0.909 & 0.970 \\
+Span        & 467 & 0.559 & 0.435 & 0.835 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 % ---------------------------------------------------------------
 \section{Error Analysis}
@@ -404,9 +481,10 @@ Eenasul Fateh, a Bangladeshi-British artist. DPR + HN correctly surfaces
 the gold passage by leveraging semantic context around the consultant
 relation, demonstrating the value of hard negative training.
 
-\paragraph{Reader failures on yes/no questions.}
-HotpotQA contains approximately 20\% yes/no questions~\cite{yang2018hotpotqa}.
-Flan-T5-xl occasionally generates explanatory text rather than a binary answer:
+\paragraph{Yes/no questions are handled well.}
+Contrary to the common assumption that generative readers mishandle binary
+questions, the breakdown (Table~\ref{tab:breakdown}) shows yes/no is in fact the
+strongest category (EM 0.909). Occasional formatting slips still occur:
 \begin{quote}
 \small
 \textit{Q: Are the Laleli Mosque and Esma Sultan Mansion in the same
@@ -414,10 +492,8 @@ neighbourhood?} \quad
 \textit{Gold: no} \quad \textit{Predicted: They are in different
 neighbourhoods of Istanbul}
 \end{quote}
-The prediction is semantically correct but fails exact match. This failure
-mode is orthogonal to retrieval quality: even perfect retrieval cannot
-resolve it without a dedicated yes/no classification head or stronger
-instruction fine-tuning.
+Here the prediction is semantically correct but fails exact match; such cases
+are rare, and a concise-answer instruction largely resolves them.
 
 \paragraph{Multi-hop reasoning failures.}
 Some questions require chaining two facts where the connection is implicit:
@@ -429,9 +505,9 @@ what New York neighbourhood?} \quad
 \textit{Predicted: New York City}
 \end{quote}
 The reader identifies the correct city but omits the specific neighbourhood,
-yielding partial F1 and EM\,=\,0. This reflects the difficulty of
-multi-step inference when the required specificity is distributed across
-two passages.
+yielding partial F1 and EM\,=\,0. Quantitatively, bridge questions --- which
+require this chaining --- score far below comparison questions (F1 0.535
+vs.\ 0.781; Table~\ref{tab:breakdown}), making them the dominant failure mode.
 
 \paragraph{Context truncation failures.}
 The reader input is truncated to 2{,}000 characters to fit within the
@@ -473,10 +549,11 @@ Recall@5\,=\,0.962 reported here --- the two measure fundamentally different
 retrieval difficulties.
 
 \paragraph{Reader limitations.}
-The Flan-T5-xl reader runs zero-shot. The dominant remaining failure modes
-(yes/no questions, multi-hop inference, and context truncation) are reader-
-and budget-side limitations rather than retrieval failures; a stronger or
-fine-tuned reader and a larger context budget would partially address them.
+The Flan-T5-xl reader runs zero-shot. The dominant remaining failure mode is
+bridge (multi-hop) questions (F1 0.535 vs.\ 0.781 for comparison), followed by
+context truncation; yes/no and comparison questions are already handled well.
+A stronger or fine-tuned reader and a larger context budget would partially
+address the remaining cases.
 
 % ---------------------------------------------------------------
 \section{Ethical Considerations}
@@ -507,7 +584,7 @@ combining BM25-based hard negative mining, DPR fine-tuning, FAISS vector
 indexing, and Flan-T5-xl generative reading. Hard negative mining improves
 Recall@1 by 13.0 points over vanilla DPR and 14.0 points over BM25, with
 matching gains in MRR@10 and nDCG@10, and these retrieval gains carry through
-to the end-to-end QA metrics (F1\,=\,0.539, EM\,=\,0.428). Our ablation shows
+to the end-to-end QA metrics (F1\,=\,0.583, EM\,=\,0.466). Our ablation shows
 that out-of-the-box dense retrieval does not consistently outperform BM25 on
 this multi-hop benchmark --- leading only marginally at R@1 while falling
 behind at higher cutoffs --- and that the improvement is attributable entirely

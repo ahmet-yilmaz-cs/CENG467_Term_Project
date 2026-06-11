@@ -7,3 +7,4 @@ numpy>=1.24.0
 tqdm>=4.66.0
 sentencepiece>=0.1.99
 accelerate>=0.26.0
+bitsandbytes>=0.43.0   # 4-bit quantisation for the reader comparison (Qwen/Phi)
