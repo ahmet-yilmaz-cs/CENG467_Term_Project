@@ -415,6 +415,19 @@ Phi-4-mini-Instruct (3.8B) & 0.520 & 0.390 \\
 \end{tabular}
 \end{table}
 
+\noindent\textbf{Reader fine-tuning (separate experiment).}
+To isolate the retrieval contribution, the main ablation deliberately uses a
+fixed, zero-shot reader: it is a neutral instrument, identical across all
+configurations, and it shows that the retrieval gains transfer to a
+general-purpose reader without benchmark-specific training. As a separate
+experiment, we LoRA fine-tune Flan-T5-xl on the HotpotQA \emph{train} split only
+(8{,}000 examples, gold-passage context) and evaluate it on the same validation
+questions with the DPR + HN retriever. Fine-tuning raises end-to-end
+performance only modestly --- F1 $0.583 \to 0.613$, EM $0.466 \to 0.492$ ---
+whereas the retrieval improvement contributed roughly $+0.10$ F1. This confirms
+that the reader is not the bottleneck: retrieval is. We therefore report reader
+fine-tuning here rather than folding it into the main ablation.
+
 \subsection{Statistical Significance and Breakdown}
 
 \noindent\textbf{Significance.}
@@ -591,8 +604,9 @@ behind at higher cutoffs --- and that the improvement is attributable entirely
 to hard negative fine-tuning. Selecting checkpoints on the global corpus
 rather than a small per-question pool is essential for a faithful comparison.
 Future work should scale hard negative mining to the full 90k training split,
-fine-tune the reader, and evaluate over a full open-domain Wikipedia corpus
-for an even more realistic retrieval scenario.
+add a cross-encoder reranking stage to lift both-passage recall, and evaluate
+over a full open-domain Wikipedia corpus for an even more realistic retrieval
+scenario.
 
 % ---------------------------------------------------------------
 \begin{thebibliography}{9}
