@@ -27,8 +27,8 @@
 }
 
 \institute{
-    \"{I}zmir Institute of Technology (\"{I}YTE), \"{I}zmir, Turkey \\
-    \email{\{300201066, 300201067, 290201066\}@std.iyte.edu.tr}
+     300201066 \quad 300201067 \quad 290201066 \\
+    \.{I}zmir Institute of Technology (\.{I}YTE), \.{I}zmir, Turkey
 }
 
 \maketitle
@@ -390,8 +390,8 @@ model change we tried.
 \noindent\textbf{Reader comparison.}
 Table~\ref{tab:readers} compares three readers on the fixed DPR + HN retriever,
 each in its best configuration. Flan-T5-xl (3B, encoder--decoder) slightly
-outperforms the larger Qwen2.5-7B-Instruct and the smaller
-Phi-4-mini-Instruct. Few-shot prompting with answer post-processing helps the
+outperforms the larger Qwen2.5-7B-Instruct~\cite{qwen2.5} and the smaller
+Phi-4-mini-Instruct~\cite{phi4}. Few-shot prompting with answer post-processing helps the
 decoder-only instruction model (Qwen: +0.025 F1) but is neutral for the others,
 and the long multi-part instruction actually \emph{harms} Flan-T5-xl ---
 prompt sensitivity is model-specific. The reader runs zero-shot; its absolute
@@ -609,7 +609,7 @@ over a full open-domain Wikipedia corpus for an even more realistic retrieval
 scenario.
 
 % ---------------------------------------------------------------
-\begin{thebibliography}{9}
+\begin{thebibliography}{99}
 
 \bibitem{karpukhin2020dpr}
 Karpukhin, V., Oguz, B., Min, S., Lewis, P., Wu, L., Edunov, S., Chen, D.,
@@ -656,6 +656,12 @@ arXiv:2210.11416 (2022)
 Izacard, G., Grave, E.: Leveraging passage retrieval with generative
 models for open domain question answering.
 In: Proceedings of EACL, pp. 874--880 (2021)
+
+\bibitem{qwen2.5}
+Qwen Team: Qwen2.5 Technical Report. arXiv preprint arXiv:2412.13663 (2024)
+
+\bibitem{phi4}
+Microsoft: Phi-4 Technical Report. arXiv preprint arXiv:2411.15124 (2024)
 
 \end{thebibliography}
 

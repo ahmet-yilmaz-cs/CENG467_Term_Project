@@ -56,7 +56,10 @@ cd CENG467_Term_Project
 pip install -r requirements.txt
 ```
 
-> **Note:** Fine-tuned model weights are not included in the repository due to size (each epoch checkpoint is ~870 MB). Either train from scratch (see steps below) or download from the shared Google Drive link and place under `models/`.
+> **Note:** Trained models and mined data are excluded from the repository due to size. Either regenerate them with the steps below, or download the pretrained artifacts from the shared Google Drive folder:
+>
+> 📁 **[Models, data & results (Google Drive)](https://drive.google.com/drive/folders/1hRsdR7WJ34R2pL9tqo8YF1IZaYoUBOM4?usp=sharing)**
+
 
 Expected model structure after training (one directory per epoch):
 ```
